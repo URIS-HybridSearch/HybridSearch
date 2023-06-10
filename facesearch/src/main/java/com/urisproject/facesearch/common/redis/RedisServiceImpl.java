@@ -1,7 +1,6 @@
 package com.urisproject.facesearch.common.redis;
 
 import com.alibaba.fastjson.JSON;
-import com.tangcheng.face_search.common.redis.RedisService;
 import lombok.Setter;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.beans.factory.annotation.Autowired;

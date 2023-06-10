@@ -1,9 +1,10 @@
-package com.urisproject.facesearch.common.utils;
+package com.urisproject.facesearch.common.util;
 
 import com.aliyun.oss.*;
 import com.aliyun.oss.model.OSSObject;
 import com.aliyun.oss.model.PutObjectResult;
 import lombok.extern.log4j.Log4j2;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -11,32 +12,34 @@ import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.text.SimpleDateFormat;
 
-/**
- * TODO: register for SSH 再改一下
- */
 @Log4j2
 @Component
 public class AliyunOSSUtil {
-
+    // Endpoint以华东1（杭州）为例，其它Region请按实际情况填写。
     @Value("${oos.endpoint}")
-    private String endpoint;
-
+    private  String endpoint;
+    // 阿里云账号AccessKey拥有所有API的访问权限，风险很高。强烈建议您创建并使用RAM用户进行API访问或日常运维，请登录RAM控制台创建RAM用户。
     @Value("${oos.keyid}")
-    private String accessKeyId;
-
+    private  String accessKeyId;
     @Value("${oos.keysecret}")
-    private String keySecret;
-
+    private  String keysecret;
+    // 填写Bucket名称，例如examplebucket。
     @Value("${oos.bucketname}")
-    private String bucketName;
-
+    private  String bucketName;
+    // 填写Object完整路径，完整路径中不能包含Bucket名称，例如exampledir/exampleobject.txt。
     @Value("${oos.filehost}")
-    private String objectName;
+    private  String objectName;
 
+    /**
+     * 上传
+     * @param
+     * @return
+     */
     public  String upload(byte[] bytes,String fileName){
         // 创建OSSClient实例。
-        OSS ossClient = new OSSClientBuilder().build(endpoint, accessKeyId, keySecret);
+        OSS ossClient = new OSSClientBuilder().build(endpoint, accessKeyId, keysecret);
         String fileLocation = objectName  +"/"+ fileName + ".jpg";
         System.out.println(fileLocation);
         try {
@@ -65,7 +68,7 @@ public class AliyunOSSUtil {
     }
     public  String download(String fileName){
         // 创建OSSClient实例。
-        OSS ossClient = new OSSClientBuilder().build(endpoint, accessKeyId, keySecret);
+        OSS ossClient = new OSSClientBuilder().build(endpoint, accessKeyId, keysecret);
         String fileLocation = objectName  +"/"+ fileName + ".jpg";
         System.out.println(fileLocation);
         try {
@@ -105,7 +108,5 @@ public class AliyunOSSUtil {
         }
         return fileLocation;
     }
-
-
 
 }

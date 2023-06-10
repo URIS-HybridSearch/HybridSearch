@@ -9,10 +9,17 @@ package com.urisproject.facesearch.model.face;
 
 import com.alibaba.fastjson.JSON;
 import com.arcsoft.face.FaceInfo;
+import com.urisproject.facesearch.common.redis.RedisService;
+import com.urisproject.facesearch.common.util.Base64Utils;
+import com.urisproject.facesearch.common.util.SnowflakeIdWorker;
+import com.urisproject.facesearch.pojo.form.MessageImageForm;
+import com.urisproject.facesearch.pojo.form.UploadResultForm;
+import com.urisproject.facesearch.web.SocketMessage;
+import com.urisproject.facesearch.web.WebSocketServer;
 import lombok.Data;
 import lombok.SneakyThrows;
 import lombok.extern.log4j.Log4j2;
-import org.apache.activemq.command.ActiveMQQueue;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jms.core.JmsMessagingTemplate;
 import org.springframework.stereotype.Component;
@@ -51,7 +58,7 @@ public class FaceList {
      * @return A list of results for each file checked.
      */
     @SneakyThrows
-    public List<UpResult> faceListCheck(File[] listFiles, String sessionId) {
+    public List<UploadResultForm> faceListCheck(File[] listFiles, String sessionId) {
         int isJpeg = 0;
         int noJpeg = 0;
         for (File f : listFiles) {
@@ -103,7 +110,7 @@ public class FaceList {
         FileInputStream fileInputStreamNewPhoto = null; // Used to process new photos
         FileInputStream fileInputStreamOldPhoto = null; // Used to process old photos        try {
         fileInputStream = new FileInputStream(file);
-        List<FaceInfo> faceInfos = faceUtils.faceFind(fileInputStream);
+        List<FaceInfo> faceInfos = faceUtils.detectFaces(fileInputStream);
         if (faceInfos.size() == 0) {
             fileInputStreamOldPhoto = new FileInputStream(file);
             WebSocketServer.sendInfo(JSON.toJSONString(
@@ -123,7 +130,7 @@ public class FaceList {
         } else {
             fileInputStreamOldPhoto = new FileInputStream(file);
             fileInputStreamNewPhoto = new FileInputStream(file);
-            String newImageBase64 = faceUtils.faceCrop(fileInputStreamNewPhoto, faceInfos.get(0).getRect());
+            String newImageBase64 = faceUtils.extractFaceImage(fileInputStreamNewPhoto, faceInfos.get(0).getRect());
             String oldImageBase64 = Base64Utils.inputStream2Base64(fileInputStreamOldPhoto);
             if (newImageBase64 == null || newImageBase64.isEmpty()) {
                 WebSocketServer.sendInfo(JSON.toJSONString(
@@ -138,7 +145,7 @@ public class FaceList {
                                     "Face detected", oldImageBase64,
                                     newImageBase64, null)),
                     sessionId);
-            byte[] feature = faceUtils.faceFeature(new FileInputStream(file), faceInfos.get(0));
+            byte[] feature = faceUtils.extractFaceFeature(new FileInputStream(file), faceInfos.get(0));
             SnowflakeIdWorker snowflakeIdWorker = new SnowflakeIdWorker(0, 0);
             String featureKey = snowflakeIdWorker.nextId() + "";
             if (feature.length == 0) {
@@ -148,21 +155,14 @@ public class FaceList {
                 log.info("Feature extracted successfully, cached ID: " + featureKey + ", expiration time: " + RedisService.TIME_ONE_MINUTE * 20);
             }
             String fileName = file.getName().replace(".jpg", "");
-            MessageImg images = new MessageImg();
+            MessageImageForm images = new MessageImageForm();
             images.setName(fileName);
             images.setImageBase64(newImageBase64);
-            images.setFeature(featureKey);
-            images.setSex("male");
+            images.setFeatureVector(featureKey);
+            images.setGender("male");
             jmsMessagingTemplate.convertAndSend(queue, JSON.toJSONString(images));
             log.info("Data sent to queue successfully.");
         }
-    } catch (FileNotFoundException e) {
-        log.error("Failed to retrieve stream.");
-        e.printStackTrace();
-    } catch (Exception e) {
-        e.printStackTrace();
-    } finally {
-        fileInputStream.close();
-    }
+
 }
 }
