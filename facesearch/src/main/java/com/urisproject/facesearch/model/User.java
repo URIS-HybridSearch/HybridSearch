@@ -1,11 +1,10 @@
 package com.urisproject.facesearch.model;
 
+import com.baomidou.mybatisplus.extension.activerecord.Model;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
+import lombok.experimental.Accessors;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import java.util.ArrayList;
 import java.util.List;
@@ -21,36 +20,19 @@ import java.util.stream.Collectors;
  * @Description:
  */
 @Data
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
-@Entity
-@Table(name = "user")
-public class User extends AuditBase {
+@EqualsAndHashCode(callSuper = true)
+@Accessors(chain = true)
+public class User extends Model {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-    @Column(nullable = false)
+    private static final long serialVersionUID = 1L;
+
+    private String userCode;
+
     private String userName;
-    @Column(nullable = false)
-    private String email;
-    @Column(nullable = false)
-    private String password;
-    @Column(columnDefinition = "tinyint(1) default 1")
-    private Boolean enabled;
 
-    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
-    @JsonIgnore
-    private List<UserRole> userRoles = new ArrayList<>();
+    private String userSex;
 
-    public List<SimpleGrantedAuthority> getRoles() {
-        List<Role> roles = userRoles.stream().map(UserRole::getRole).collect(Collectors.toList());
-        List<SimpleGrantedAuthority> authorities = new ArrayList<>();
-        roles.forEach(role -> authorities.add(new SimpleGrantedAuthority("ROLE_" + role.getName())));
-        return authorities;
-    }
-
+    private String userImage;
 
 
 }

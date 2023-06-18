@@ -1,16 +1,21 @@
 package com.urisproject.facesearch.web;
 
-import jakarta.websocket.OnClose;
-import jakarta.websocket.OnError;
-import jakarta.websocket.OnMessage;
-import jakarta.websocket.OnOpen;
+import com.alibaba.fastjson.JSON;
+import com.urisproject.facesearch.common.util.SpringContext;
+import com.urisproject.facesearch.model.User;
+import com.urisproject.facesearch.model.face.FaceSearchHandler;
+import com.urisproject.facesearch.pojo.form.FaceSearchForm;
+import io.micrometer.common.util.StringUtils;
+import jakarta.websocket.*;
 import jakarta.websocket.server.PathParam;
 import jakarta.websocket.server.ServerEndpoint;
 import lombok.extern.log4j.Log4j2;
-import org.hibernate.Session;
+
 import org.springframework.stereotype.Component;
 
+
 import java.io.IOException;
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -70,7 +75,7 @@ public class WebSocketServer {
         } else {
             log.info("Processing face search message.");
             try {
-                List<User> users = faceSearchHandler.handleFaceSearch(faceSearchForm.getImageBase64());
+                List<User> users = faceSearchHandler.faceHandler(faceSearchForm.getImageBase64());
                 if (!users.isEmpty()) {
                     WebSocketServer.sendInfo(JSON.toJSONString(users), faceSearchForm.getSessionId());
                 }
