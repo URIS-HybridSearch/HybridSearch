@@ -3,6 +3,7 @@ from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 from sklearn.feature_extraction.text import TfidfVectorizer
 import numpy as np
+import pickle
 
 # download stopwords and punkt
 nltk.download('stopwords')
@@ -32,9 +33,21 @@ vectorizer = TfidfVectorizer()
 # fit the vectorizer on the processed captions
 tfidf_matrix = vectorizer.fit_transform(processed_captions)
 
+# save the vectorizer and the matrix to disk
+with open('tfidf_vectorizer.pkl', 'wb') as f:
+    pickle.dump(vectorizer, f)
+with open('tfidf_matrix.pkl', 'wb') as f:
+    pickle.dump(tfidf_matrix, f)
+
 
 # define a function to search captions
-def search_captions(query, tfidf_matrix, vectorizer, n_results=10):
+def search_captions(query, vectorizer_path='tfidf_vectorizer.pkl', matrix_path='tfidf_matrix.pkl', n_results=10):
+    # load the vectorizer and the matrix from disk
+    with open(vectorizer_path, 'rb') as f:
+        vectorizer = pickle.load(f)
+    with open(matrix_path, 'rb') as f:
+        tfidf_matrix = pickle.load(f)
+
     # preprocess the query
     query = query.lower()
     words = word_tokenize(query)
@@ -58,7 +71,7 @@ def search_captions(query, tfidf_matrix, vectorizer, n_results=10):
 
 
 # example usage
-query = "Docker"
-results = search_captions(query, tfidf_matrix, vectorizer, n_results=5)
+query = "sing"
+results = search_captions(query, vectorizer_path='tfidf_vectorizer.pkl', matrix_path='tfidf_matrix.pkl', n_results=5)
 for result in results:
     print(result.strip())

@@ -2,18 +2,22 @@
 <html>
     <head>
         <meta charset="UTF-8">
-        <title>Simple Image Search Engine</title>
+        <title>Image and Text Search Engine</title>
         <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
     </head>
     <body>
         <div class="container">
-            <h1>Simple Image Search Engine</h1>
+            <h1>Image and Text Search Engine</h1>
             <div class="row">
                 <div class="col-md-6">
-                    <form method="POST" enctype="multipart/form-data">
+                    <form method="POST" enctype="multipart/form-data" action="/">
                         <div class="form-group">
                             <label for="query_img">Select an image to search for:</label>
                             <input type="file" class="form-control" id="query_img" name="query_img">
+                        </div>
+                        <div class="form-group">
+                            <label for="query_text">Enter text to search for:</label>
+                            <input type="text" class="form-control" id="query_text" name="query_text">
                         </div>
                         <button type="submit" class="btn btn-primary">Search</button>
                     </form>
@@ -22,6 +26,9 @@
                     <h2>Query:</h2>
                     {% if query_path %}
                     <img src="{{ query_path }}" class="img-responsive">
+                    {% endif %}
+                    {% if query_text %}
+                    <p>Text query: {{ query_text }}</p>
                     {% endif %}
                 </div>
             </div>
