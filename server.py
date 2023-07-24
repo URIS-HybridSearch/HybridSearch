@@ -45,16 +45,17 @@ def index():
 
         # Search captions and get top n_results
         structured_results = search_captions(query_text)
-        n_results = 50
+        n_results = 200
         structured_results = structured_results[:n_results]
 
         # Combine structured and unstructured results and sort by score
         combined_results = []
         for score, path in unstructured_scores:
-            combined_results.append((score, path))
-        for caption in structured_results:
-            combined_results.append((1.0, caption))
-        combined_results = sorted(combined_results, key=lambda x: x[0], reverse=True)[:10]
+            combined_results.append((score/2, path))
+        for similarity_score, caption in structured_results:
+            combined_results.append((similarity_score, "static/img/"+caption.strip().split(',', 1)[0]))
+
+        combined_results = sorted(combined_results, key=lambda x: x[0], reverse=True)[:30]
 
         return render_template('index.html',
                                query_path=uploaded_img_path,
@@ -90,10 +91,14 @@ def search_captions(query, vectorizer_path='tfidf_vectorizer.pkl', matrix_path='
     # rank captions based on similarity scores
     ranked_indices = np.argsort(similarities)[::-1][:n_results]
 
-    # return the top n_results captions
+    # return the top n_results captions with their similarity scores
     results = []
     for idx in ranked_indices:
-        results.append(captions[idx])
+        similarity_score = similarities[idx]
+        caption = captions[idx]
+        results.append((similarity_score, caption))
+        print(similarity_score)
+
     return results
 
 if __name__=="__main__":
