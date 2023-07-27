@@ -30,12 +30,13 @@ with open('captions.txt', 'r') as f:
     for line in f.readlines():
         temp = line.split(',',1)
         lines[temp[0]] = temp[1]
-        
+
 @app.route('/', methods=['GET', 'POST'])
 def index():
     if request.method == 'POST':
         query_img = request.files['query_img']
         query_text = request.form['query_text']
+        query_size = request.form['query_size']
 
         # Save query image
         img = Image.open(query_img.stream)  # PIL image
@@ -57,9 +58,22 @@ def index():
         # Combine structured and unstructured results and sort by score
         combined_results = []
         for score, path in unstructured_scores:
+            with Image.open(path) as img:
+                # 获取图像的宽度和高度
+                width, height = img.size
+                if query_size!="":
+                    if str(width) + "*" + str(height) != query_size:
+                        continue
             combined_results.append((score/2, Path.__fspath__(path)))
         for similarity_score, caption in structured_results:
-            combined_results.append((similarity_score, "static/img/"+caption.strip().split(',', 1)[0]))
+            path = "static/img/"+caption.strip().split(',', 1)[0]
+            with Image.open(path) as img:
+                # 获取图像的宽度和高度
+                width, height = img.size
+                if query_size!="":
+                    if str(width) + "*" + str(height) != query_size:
+                        continue
+            combined_results.append((similarity_score, path))
 
         combined_results = sorted(combined_results, key=lambda x: x[0], reverse=True)[:30]
 
