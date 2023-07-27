@@ -25,7 +25,12 @@ for feature_path in Path("./static/feature").glob("*.npy"):
     img_paths.append(Path("./static/img") / (feature_path.stem + ".jpg"))
 features = np.array(features)
 
-
+lines = {}
+with open('captions.txt', 'r') as f:
+    for line in f.readlines():
+        temp = line.split(',',1)
+        lines[temp[0]] = temp[1]
+        
 @app.route('/', methods=['GET', 'POST'])
 def index():
     if request.method == 'POST':
@@ -43,6 +48,7 @@ def index():
         ids = np.argsort(dists)[:300]  # Top 30 results
         unstructured_scores = [(dists[id], img_paths[id]) for id in ids]
 
+
         # Search captions and get top n_results
         structured_results = search_captions(query_text)
         n_results = 200
@@ -51,15 +57,18 @@ def index():
         # Combine structured and unstructured results and sort by score
         combined_results = []
         for score, path in unstructured_scores:
-            combined_results.append((score/2, path))
+            combined_results.append((score/2, Path.__fspath__(path)))
         for similarity_score, caption in structured_results:
             combined_results.append((similarity_score, "static/img/"+caption.strip().split(',', 1)[0]))
 
         combined_results = sorted(combined_results, key=lambda x: x[0], reverse=True)[:30]
 
+        http_result = []
+        for result in combined_results:
+            http_result.append((lines[result[1].replace("static\\img\\","").replace("static/img/","")],result[1]))
         return render_template('index.html',
                                query_path=uploaded_img_path,
-                               scores=combined_results)
+                               scores=http_result)
     else:
         return render_template('index.html')
 
@@ -97,8 +106,6 @@ def search_captions(query, vectorizer_path='tfidf_vectorizer.pkl', matrix_path='
         similarity_score = similarities[idx]
         caption = captions[idx]
         results.append((similarity_score, caption))
-        print(similarity_score)
-
     return results
 
 if __name__=="__main__":
