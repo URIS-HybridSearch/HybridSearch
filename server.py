@@ -43,18 +43,18 @@ def index():
         uploaded_img_path = "static/uploaded/" + datetime.now().isoformat().replace(":", ".") + "_" + query_img.filename
         img.save(uploaded_img_path)
 
-        # Run search
+        # Run search  
         query = fe.extract(img)
         dists = np.linalg.norm(features-query, axis=1)  # L2 distances to features
-        ids = np.argsort(dists)[:300]  # Top 30 results
+        ids = np.argsort(dists)[:300]
         unstructured_scores = [(dists[id], img_paths[id]) for id in ids]
 
-
+        '''
         # Search captions and get top n_results
         structured_results = search_captions(query_text)
         n_results = 200
         structured_results = structured_results[:n_results]
-
+        '''
         # Combine structured and unstructured results and sort by score
         combined_results = []
         for score, path in unstructured_scores:
@@ -65,6 +65,7 @@ def index():
                     if str(width) + "*" + str(height) != query_size:
                         continue
             combined_results.append((score/2, Path.__fspath__(path)))
+        '''
         for similarity_score, caption in structured_results:
             path = "static/img/"+caption.strip().split(',', 1)[0]
             with Image.open(path) as img:
@@ -74,12 +75,14 @@ def index():
                     if str(width) + "*" + str(height) != query_size:
                         continue
             combined_results.append((similarity_score, path))
-
-        combined_results = sorted(combined_results, key=lambda x: x[0], reverse=True)[:30]
+        '''
+        combined_results = sorted(combined_results, key=lambda x: x[0], reverse=True)[:100]
 
         http_result = []
         for result in combined_results:
-            http_result.append((lines[result[1].replace("static\\img\\","").replace("static/img/","")],result[1]))
+            cap = lines[result[1].replace("static\\img\\","")]
+            if query_text in cap:
+                http_result.append((cap,result[1]))
         return render_template('index.html',
                                query_path=uploaded_img_path,
                                scores=http_result)
