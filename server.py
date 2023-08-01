@@ -1,382 +1,229 @@
-from datetime import datetime
-from pathlib import Path
-import time
-from datetime import datetime
+import nanopq
 import numpy as np
 from PIL import Image
-from flask import Flask, request, render_template
-import random
-import point
-import utils
-import heapq
-from product_quantization import ProductQuantizer
-import vptree
 from feature_extractor import FeatureExtractor
+from datetime import datetime
+from flask import Flask, request, render_template
+from pathlib import Path
+import nltk
+from nltk.corpus import stopwords
+from nltk.tokenize import word_tokenize
+from sklearn.feature_extraction.text import TfidfVectorizer
+import pickle
+import logging
+import json
+
+# download stopwords and punkt
+nltk.download('stopwords')
+nltk.download('punkt')
 
 app = Flask(__name__)
 
+# Set up logging
+logging.basicConfig(filename='app.log', level=logging.DEBUG)
+
 # Read image features
 fe = FeatureExtractor()
-pq = ProductQuantizer(num_clusters=256)
-
 features = []
 img_paths = []
 for feature_path in Path("./static/feature").glob("*.npy"):
-    features.append(np.load(Path.__fspath__(feature_path)))
+    features.append(np.load(feature_path))
     img_paths.append(Path("./static/img") / (feature_path.stem + ".jpg"))
 features = np.array(features)
 
-utils.lines = {}
-with open('captions.txt', 'r') as f:
-    for line in f.readlines():
-        temp = line.split(',', 1)
-        utils.lines[temp[0]] = temp[1]
+# Set up parameters for PQ
+N_subq = 16  # Number of subquantizers
+N_ref = 1000  # Number of vectors to use as reference for training PQ
+code_dtype = np.uint8  # Data type for PQ codes
 
-indices = {}
+# Create an empty dictionary to store the captions
+caption_dict = {}
 
-
-def pq_pre_query(pq_k, img, uploaded_img_path):
-    pq_path = Path("./static/code")
-    pq_path.mkdir(parents=True, exist_ok=True)
-    code_path = Path("./static/code") / ("codeword_" + str(pq_k) + ".npy")  # e.g., ./static/feature/xxx.npy
-    dict_path = Path("./static/code") / ("dict_" + str(pq_k) + ".npy")
-
-    query = fe.extract(img)
-    valid_candidate = []
-
-    for feature_path in Path("./static/feature").glob("*.npy"):
-        filename_without_suffix = feature_path.stem
-        if utils.is_valid(Path("./static/img") / (filename_without_suffix + ".jpg")):
-            valid_candidate.append(filename_without_suffix)
-
-
-    if not code_path.exists():
-        # codebook construction
-        # Number of vectors to concatenate
-        features_list = []  # List to store extracted features
-        # the codeword is trained already and provided, so this training can be ignored.
-        for feature_path in Path("./static/pq_feature_train").glob("*.npy"):
-            # print(img_path)  # e.g., ./static/img/xxx.jpg
-            features_list.append(np.load(feature_path))  # Append feature to the list
-            print(len(features_list))
-
-        for feature_path in Path("./static/pq_feature_train2").glob("*.npy"):
-            # print(img_path)  # e.g., ./static/img/xxx.jpg
-            features_list.append(np.load(feature_path))  # Append feature to the list
-            print(len(features_list))
-
-        print("Size: ", np.array(features_list).shape)
-
-        codeword = pq.train(np.array(features_list), pq_k)
-        np.save(code_path, codeword)
-    else:
-        codeword = np.load(code_path)
-
-    utils.t1 = time.time()
-    print("The shape of codeword: ", codeword.shape)
-
-    min_score_paths = []
-    file_code_dict = {}
-
-    if not dict_path.exists():
-        # file_code_dict = {}
-        for feature_path in Path("./static/feature").glob("*.npy"):
-            vec = []
-            vec.append(np.load(feature_path))
-            pqcode = pq.encode(codeword, np.array(vec))
-            filename_without_suffix = feature_path.stem
-            # print(filename_without_suffix)
-            file_code_dict[filename_without_suffix] = pqcode
-            np.save(dict_path, file_code_dict)
-            # print(file_code_dict)
-    else:
-        file_code_dict = np.load(dict_path, allow_pickle=True).item()
-
-    print("1. Current time is:", datetime.now())
-    pqdistance_filename_dict = {}
-    counter = 0
-    for filename, pqcode in file_code_dict.items():
-        if filename in valid_candidate:
-            dist = pq.search(codeword, pqcode, query)
-            dist = dist[0]
-            if dist in pqdistance_filename_dict:
-                pqdistance_filename_dict[dist].append(filename)
-            else:
-                pqdistance_filename_dict[dist] = [filename]
-        counter += 1
-        if counter == utils.database_size:
-            break
-    print("2. Current time is:", datetime.now())
-    # Get the minimum distances using heapq
-    smallest_distances = heapq.nsmallest(5, pqdistance_filename_dict.keys())
-    # print(smallest_distances)
-    # Retrieve filenames corresponding to the smallest distances
-    filenames = [filename for distance, filenames in pqdistance_filename_dict.items() if
-                 distance in smallest_distances for filename in filenames]
-    print("3. Current time is:", datetime.now())
-    # Print the filenames
-    # print(filenames)
-    for filename in filenames:
-        vec = np.load(Path("./static/feature") / (filename + ".npy"))
-        real_dist = np.linalg.norm(query - vec)  # Calculate the real distance
-        min_score_paths.append((filename, real_dist))
-
-    # Rank the paths in ascending order based on real distance
-    min_score_paths.sort(key=lambda x: x[1])
-    min_score_paths = min_score_paths[:utils.k_results]
-
-    http_result = []
-
-    for filename, real_dist in min_score_paths:
-        converted_path = "static/img/" + filename + ".jpg"
-        converted_filename = filename + ".jpg"
-        http_result.append((utils.lines[converted_filename], converted_path))
-
-    utils.t2 = time.time()
-
-    return render_template('index.html',
-                           query_path=uploaded_img_path,
-                           scores=http_result,
-                           search_time="Query time: " + str(round(1000 * (utils.t2 - utils.t1))) + "ms",
-                           default_text=utils.query_text,
-                           default_size=utils.query_size,
-                           default_mode=utils.mode,
-                           default_database_size=utils.database_size,
-                           default_num_results=utils.k_results,
-                           num_results=str(len(http_result)))
-
-def pq_post_query(pq_k, img, uploaded_img_path):
-
-    pq_path = Path("./static/code")
-    pq_path.mkdir(parents=True, exist_ok=True)
-    code_path = Path("./static/code") / ("codeword_" + str(pq_k) + ".npy")  # e.g., ./static/feature/xxx.npy
-    dict_path = Path("./static/code") / ("dict_" + str(pq_k) + ".npy")
-    query = fe.extract(img)
-
-    if not code_path.exists():
-        # codebook construction
-        # Number of vectors to concatenate
-        features_list = []  # List to store extracted features
-        # the codeword is trained already and provided, so this training can be ignored.
-        for feature_path in Path("./static/pq_feature_train").glob("*.npy"):
-            # print(img_path)  # e.g., ./static/img/xxx.jpg
-            features_list.append(np.load(feature_path))  # Append feature to the list
-            print(len(features_list))
-
-        for feature_path in Path("./static/pq_feature_train2").glob("*.npy"):
-            # print(img_path)  # e.g., ./static/img/xxx.jpg
-            features_list.append(np.load(feature_path))  # Append feature to the list
-            print(len(features_list))
-
-        print("size: ", np.array(features_list).shape)
-
-        codeword = pq.train(np.array(features_list), pq_k)
-        np.save(code_path, codeword)
-    else:
-        codeword = np.load(code_path)
-
-    utils.t1 = time.time()
-    print("The shape of codeword: ", codeword.shape)
-
-    min_score_paths = []
-    file_code_dict = {}
-
-    if not dict_path.exists():
-        # file_code_dict = {}
-        for feature_path in Path("./static/feature").glob("*.npy"):
-            vec = []
-            vec.append(np.load(feature_path))
-            pqcode = pq.encode(codeword, np.array(vec))
-            filename_without_suffix = feature_path.stem
-            # print(filename_without_suffix)
-            file_code_dict[filename_without_suffix] = pqcode
-            np.save(dict_path, file_code_dict)
-            # print(file_code_dict)
-    else:
-        file_code_dict = np.load(dict_path, allow_pickle=True).item()
-
-    print("1. Current time is:", datetime.now())
-    pqdistance_filename_dict = {}
-    counter = 0
-    for filename, pqcode in file_code_dict.items():
-        dist = pq.search(codeword, pqcode, query)
-        dist = dist[0]
-        if dist in pqdistance_filename_dict:
-            pqdistance_filename_dict[dist].append(filename)
-        else:
-            pqdistance_filename_dict[dist] = [filename]
-        counter += 1
-        if counter == utils.database_size:
-            break
-    print("2. Current time is:", datetime.now())
-    # Get the minimum distances using heapq
-    smallest_distances = heapq.nsmallest(5, pqdistance_filename_dict.keys())
-    # print(smallest_distances)
-    # Retrieve filenames corresponding to the smallest distances
-    filenames = [filename for distance, filenames in pqdistance_filename_dict.items() if
-                 distance in smallest_distances for filename in filenames]
-    print("3. Current time is:", datetime.now())
-    # Print the filenames
-    # print(filenames)
-    for filename in filenames:
-        vec = np.load(Path("./static/feature") / (filename + ".npy"))
-        real_dist = np.linalg.norm(query - vec)  # Calculate the real distance
-
-        if utils.is_valid(Path("./static/img") / (filename + ".jpg")):
-            min_score_paths.append((filename, real_dist))
-
-    # Rank the paths in ascending order based on real distance
-    min_score_paths.sort(key=lambda x: x[1])
-    min_score_paths = min_score_paths[:utils.k_results]
-
-    http_result = []
-
-    for filename, real_dist in min_score_paths:
-        converted_path = "static/img/" + filename + ".jpg"
-        converted_filename = filename + ".jpg"
-        http_result.append((utils.lines[converted_filename], converted_path))
-
-    utils.t2 = time.time()
-
-    return render_template('index.html',
-                           query_path=uploaded_img_path,
-                           scores=http_result,
-                           search_time="Query time: " + str(round(1000 * (utils.t2 - utils.t1))) + "ms",
-                           default_text=utils.query_text,
-                           default_size=utils.query_size,
-                           default_mode=utils.mode,
-                           default_database_size=utils.database_size,
-                           default_num_results=utils.k_results,
-                           num_results=str(len(http_result)))
+# Load the dictionary from the JSON file
+with open('captions.json', 'r') as f:
+    caption_dict = json.load(f)
 
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
+
     if request.method == 'POST':
-        utils.query_img = request.files.get('query_img')
-        utils.query_text = request.form.get('query_text')
-        if utils.query_text is None:
-            utils.query_text = ""
-        utils.query_size = request.form.get('query_size')
-        if utils.query_size is None:
-            utils.query_size = "any"
-        utils.query_anns = request.form.get('anns_method')
-        # Split the string based on spaces
-        split_string = utils.query_anns.split()
-        # Extract the string part
-        string_part = " ".join(split_string[:-1])
-        pq_k = 16
-        if string_part == "product quantization":
-            utils.query_anns = string_part
-            # Extract the integer part
-            pq_k = int(split_string[-1])
+        query_img = request.files['query_img']
+        query_text = request.form['query_text']
+        query_size = request.form['query_size']
+        search_type = request.form['search_type']
 
-        if utils.query_anns is None:
-            utils.query_size = "VP-Tree"
-        utils.mode = request.form.get('search_type')
-        utils.database_size = int(request.form.get("database_size"))
-        utils.k_results = int(request.form.get("num_results"))
-        if not utils.query_text and utils.query_size == "any":
-            utils.mode = "no filtering"
-
-        # Save query image
-        img = Image.open(utils.query_img.stream)  # PIL image
-        uploaded_img_path = "static/uploaded/" + datetime.now()\
-            .isoformat().replace(":", ".") + "_" + utils.query_img.filename
+        # Save query image in the folder.
+        img = Image.open(query_img.stream)  # PIL image
+        uploaded_img_path = "static/uploaded/" + datetime.now().isoformat().replace(":", ".") + "_" + query_img.filename
         img.save(uploaded_img_path)
 
-        # PQ
-        if utils.query_anns == "product quantization":
-
-            if utils.mode == "post-query filtering":
-                return pq_post_query(pq_k, img, uploaded_img_path)
-
-            else:
-                return pq_pre_query(pq_k, img, uploaded_img_path)
-
-        # vp-tree
-        else:
+        # normal hybrid search
+        if search_type == "normal":
             # Run search
-            query = fe.extract(img).tolist()
-            query = point.Point(coordinates=query, src="query_point")
+            query = fe.extract(img)
+            dists = np.linalg.norm(features - query, axis=1)  # L2 distances to features
+            ids = np.argsort(dists)[:300]
+            unstructured_scores = [(dists[id], img_paths[id]) for id in ids]
 
-            if utils.mode != "pre-query filtering":
-                full_model_name = "full_model" + "_" + str(utils.database_size)
-                if full_model_name not in indices:
-                    utils.t3 = time.time()
-                    full_model = vptree.Vptree([point.Point(coordinates=features[i].tolist(),
-                                                            src=Path.__fspath__(img_paths[i])) for i in
-                                                range(utils.database_size)])
-                    utils.t4 = time.time()
-                    indices[full_model_name] = full_model
-                else:
-                    utils.t4 = utils.t3 = 0
-                utils.t1 = time.time()
-                if utils.mode != "post-query filtering":
-                    result = indices[full_model_name].knn_search(query, utils.k_results)
-                else:
-                    count = 0
-                    for i in range(50):
-                        if utils.is_valid(img_paths[random.randint(0, utils.database_size - 1)]):
-                            count += 1
-                    search_k = utils.database_size
-                    if count != 0:
-                        p = float(count) / 50
-                        search_k = min(utils.k_results / p, utils.database_size)
-                    result = indices[full_model_name].knn_search(query, search_k)
-                    result.queue = [x for x in result.queue if x.passes_filter()]
-                utils.t2 = time.time()
-            else:
-                criteria = utils.query_text + "_" + utils.query_size + "_" + str(utils.database_size)
-                if criteria in indices:
-                    utils.t4 = utils.t3 = 0
-                else:
-                    utils.t3 = time.time()
-                    filtered_set = []
-                    for i in range(utils.database_size):
-                        if utils.is_valid(img_paths[i]):
-                            filtered_set.append(i)
-                    if len(filtered_set) == 0:
-                        return render_template('index.html',
-                                               num_results="0",
-                                               default_text=utils.query_text,
-                                               default_size=utils.query_size,
-                                               default_mode=utils.mode,
-                                               default_database_size=utils.database_size,
-                                               default_num_results=utils.k_results)
-                    partial_model = vptree.Vptree([point.Point(coordinates=features[i].tolist(),
-                                                               src=Path.__fspath__(img_paths[i])) for i in filtered_set])
-                    utils.t4 = time.time()
-                    indices[criteria] = partial_model
-                utils.t1 = time.time()
-                result = indices[criteria].knn_search(query, utils.k_results)
-                utils.t2 = time.time()
-            print(result.queue)
-            http_result = [(utils.lines[x.path.replace("static\\img\\", "")], x.path)
-                           for x in sorted(list(result.queue), reverse=True)]
-            print(http_result)
-            index_time = str(round(1000 * (utils.t4 - utils.t3)))
+            # Combine structured and unstructured results and sort by score
+            combined_results = []
+            for score, path in unstructured_scores:
+                with Image.open(path) as img:
+                    # 获取图像的宽度和高度
+                    width, height = img.size
+                    if query_size != "":
+                        if str(width) + "*" + str(height) != query_size:
+                            continue
+                combined_results.append((score / 2, Path.__fspath__(path)))
+
+            combined_results = sorted(combined_results, key=lambda x: x[0], reverse=True)[:60]
+
+            http_result = []
+            for result in combined_results:
+                caps = caption_dict[result[1].replace("static\\img\\", "")]
+                for cap in caps:
+                    if query_text in cap:
+                        http_result.append((cap, result[1]))
+                        break
+
             return render_template('index.html',
                                    query_path=uploaded_img_path,
-                                   scores=http_result,
-                                   search_time="Query time: " + str(round(1000 * (utils.t2 - utils.t1))) + "ms",
-                                   indexing_time="Indexing time: " + index_time + "ms"
-                                   if index_time != "0" else
-                                   "Index is already built.",
-                                   default_text=utils.query_text,
-                                   default_size=utils.query_size,
-                                   default_mode=utils.mode,
-                                   default_database_size=utils.database_size,
-                                   default_num_results=utils.k_results,
-                                   num_results=str(len(http_result)))
+                                   scores=http_result)
+
+        elif search_type == 'tfidf':
+            # Load the TF-IDF vectorizer and the TF-IDF matrix from disk
+            with open('tfidf_vectorizer.pkl', 'rb') as f:
+                vectorizer = pickle.load(f)
+            with open('tfidf_matrix.pkl', 'rb') as f:
+                tfidf_matrix = pickle.load(f)
+
+            # Preprocess the query text
+            query_text = query_text.lower()
+            words = word_tokenize(query_text)
+            stop_words = set(stopwords.words('english'))
+            words = [word for word in words if word.isalnum() and word not in stop_words]
+            query_text = ' '.join(words)
+
+            # Compute the TF-IDF vector for the query text
+            query_tfidf = vectorizer.transform([query_text])
+
+            # Compute cosine similarities between the query vector and all captions
+            similarities = np.dot(tfidf_matrix, query_tfidf.T).toarray().flatten()
+
+            # Rank captions based on similarity scores
+            ranked_indices = np.argsort(similarities)[::-1][:200]
+
+            # Get top n_results captions with their similarity scores
+            tfidf_results = []
+            for idx in ranked_indices:
+                similarity_score = similarities[idx]
+                print(idx)
+                # caption = lines[str(idx) + ".jpg"]
+                caption = lines[idx]
+                print(caption)
+                # tfidf_results.append((similarity_score, caption))
+
+            # Run search for images
+            query = fe.extract(img)
+            dists = np.linalg.norm(features - query, axis=1)  # L2 distances to features
+            ids = np.argsort(dists)[:200]
+            unstructured_scores = [(dists[id], img_paths[id]) for id in ids]
+
+            # Combine structured and unstructured results and sort by score
+            combined_results = []
+            for s_score, caption in tfidf_results:
+                for u_score, path in unstructured_scores:
+                    if Path.__fspath__(path) == caption.replace("\n", ""):
+                        with Image.open(path) as img:
+                            # 获取图像的宽度和高度
+                            width, height = img.size
+                            if query_size != "":
+                                if str(width) + "*" + str(height) != query_size:
+                                    continue
+                        combined_results.append(((s_score + u_score) / 2, Path.__fspath__(path)))
+                        break
+
+            combined_results = sorted(combined_results, key=lambda x: x[0], reverse=True)[:100]
+
+            http_result = []
+            for result in combined_results:
+                http_result.append((lines[result[1].replace("static\\img\\", "")], result[1]))
+
+            return render_template('index.html',
+                                   query_path=uploaded_img_path,
+                                   scores=http_result)
+
+
+        # product quantization
+        elif search_type == 'pq':
+            pq = nanopq.PQ(M=N_subq, Ks=256)
+            # Load PQ codes from codes.npy file
+            try:
+                codes_dict = np.load('./static/code/codes.npy', allow_pickle=True).item()
+            except Exception as e:
+                logging.error(f"Error loading PQ codes: {e}")
+                return render_template('index.html', error="Error loading PQ codes from file.")
+
+            logging.debug("A")
+            # Create a new dictionary to store PQ codes along with image paths
+            # key: path of the image
+            # value: product quantization code.
+            X_code_dict = {}
+            for key, value in codes_dict.items():
+                X_code_dict[Path(key)] = value
+
+            logging.debug("B")
+            X_code = list(X_code_dict.values())
+
+            # Extract features from query image and encode using PQ
+            query = fe.extract(img)
+            query_code = pq.encode(np.array(query, dtype=np.float32)).astype(code_dtype)
+
+            logging.debug("C")
+
+            # Compute distances between query code and indexed codes
+            unstructured_scores = pq.dtable(query_code).adist(X_code)
+            logging.log(unstructured_scores)
+
+            # Combine structured and unstructured results and sort by score
+            combined_results = []
+            for score, path in unstructured_scores:
+                with Image.open(path) as img:
+                    # 获取图像的宽度和高度
+                    width, height = img.size
+                    if query_size != "":
+                        if str(width) + "*" + str(height) != query_size:
+                            continue
+                combined_results.append((score / 2, Path.__fspath__(path)))
+
+            # Log search results
+            for score, path in unstructured_scores:
+                logging.debug(f"Score: {score:.2f}, Path: {path}")
+
+            # Display search results
+            http_result = []
+            for result in combined_results:
+                cap = lines[result[1].replace("static\\img\\", "")]
+                if query_text in cap:
+                    http_result.append((cap, result[1]))
+
+            return render_template('index.html',
+                                   query_path=uploaded_img_path,
+                                   scores=http_result)
+
+        return render_template('index.html')
+
     else:
-        return render_template('index.html', num_results="",
-                               default_mode="no filtering",
-                               default_text="",
-                               default_size="any",
-                               default_database_size=100,
-                               default_num_results=10)
+        return render_template('index.html')
 
 
 if __name__ == "__main__":
+
+    # Get the number of key-value pairs in the lines dictionary
+    num_pairs = len(caption_dict)
+
+    print("The lines dictionary contains", num_pairs, "key-value pairs.")
+
+    print("Open the web on http://localhost:5000")
     app.run("0.0.0.0")

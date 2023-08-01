@@ -22,7 +22,6 @@ if __name__ == '__main__':
     X_feat = []
     img_paths = []
     for i, img_path in enumerate(sorted(Path("./static/feature").glob("*.npy"))):
-
         feature = np.load(img_path)
         X_feat.append(feature)
         img_paths.append(Path("./static/img") / (img_path.stem + ".jpg"))
@@ -43,10 +42,3 @@ if __name__ == '__main__':
     # Save dictionary to a file
     np.save("./static/code/codes.npy", code_dict)
     print(f"Saved codes to disk")
-
-    # # Save each code to a separate file (optional)
-    # for i, img_path in enumerate(sorted(Path("./static/feature").glob("*.npy"))):
-    #     code_path = Path("./static/code") / (img_path.stem + ".npy")
-    #     np.save(code_path, X_code[i])
-    #     print(f"Saved code {i+1}/{len(list(Path('./static/feature').glob('*.npy')))}")
-
