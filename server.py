@@ -72,6 +72,7 @@ def index():
             # Combine structured and unstructured results and sort by score
             combined_results = []
             for score, path in unstructured_scores:
+                print(path)
                 with Image.open(path) as img:
                     # 获取图像的宽度和高度
                     width, height = img.size
@@ -103,7 +104,7 @@ def index():
 
             # Preprocess the query text
             query_text = query_text.lower()
-            print(query_text)
+            # print(query_text)
             words = word_tokenize(query_text)
             stop_words = set(stopwords.words('english'))
             words = [word for word in words if word.isalnum() and word not in stop_words]
@@ -116,7 +117,7 @@ def index():
             similarities = np.dot(tfidf_matrix, user_input_vector.T).toarray().flatten()
 
             # Rank captions based on similarity scores
-            ranked_indices = np.argsort(similarities)[::-1][:150]
+            ranked_indices = np.argsort(similarities)[::-1][:500]
 
             # Retrieve the top 50 image filenames and captions
             tfidf_results = []
@@ -124,13 +125,13 @@ def index():
                 image_filename = lines[idx].split(',')[0]
                 caption = lines[idx].split(',')[1]
                 tfidf_results.append(((Path("./static/img") / image_filename), caption))
-                # print(Path("./static/img") / image_filename, caption)
+                print(Path("./static/img") / image_filename, caption)
 
             print("============================")
             # Run search for images
             query = fe.extract(img)
             dists = np.linalg.norm(features - query, axis=1)  # L2 distances to features
-            ids = np.argsort(dists)[:300]
+            ids = np.argsort(dists)[:500]
             unstructured_result = [(dists[id], img_paths[id]) for id in ids]
 
             # Iterate through unstructured_result
@@ -149,34 +150,44 @@ def index():
                 for dist, img_path in unstructured_result:
                     if img_path == filename:
                         score = dist
+                        intersection.append((filename, caption, score))
                         break
-                intersection.append((filename, caption, score))
+
             # Iterate through the intersection
             # for image_filename in intersection:
             #     # Access the image filename and perform further processing or operations
             #     print("Common Image Filename:", image_filename)
+            # print("A--------")
+            # combined_results = []
+            #
+            # for image_filename, caption, score in intersection:
+            #     with Image.open(image_filename) as img:
+            #         # 获取图像的宽度和高度
+            #         width, height = img.size
+            #         if query_size != "":
+            #             if str(width) + "*" + str(height) != query_size:
+            #                 continue
+            #     combined_results.append((image_filename, caption, score))
+            #     print((image_filename, caption, score))
+            #     # print(" result: ", image_filename)
+            #     break
+            #
+            # # for image_filename, caption, score in combined_results:
+            # #     print("Common Image Filename:", image_filename)
+            #
+            # print("B===================")
+            combined_results = sorted(intersection, key=lambda x: x[2], reverse=True)[:30]
+            for image_filename, a, b in intersection:
+                # Access the image filename and perform further processing or operations
+                print("Common Image Filename:", image_filename)
+            combined_results = [(caption, image_filename) for image_filename, caption, _ in combined_results]
 
-            combined_results = []
-
-            for image_filename, caption, score in intersection:
-                with Image.open(image_filename) as img:
-                    # 获取图像的宽度和高度
-                    width, height = img.size
-                    if query_size != "":
-                        if str(width) + "*" + str(height) != query_size:
-                            continue
-                combined_results.append((image_filename, caption, score))
-                print(" result: ", image_filename)
-                break
-
-            combined_results = sorted(combined_results, key=lambda x: x[2], reverse=True)[:30]
-
-            combined_results = [(image_filename, caption) for image_filename, caption, _ in combined_results]
+            # for image_filename, caption in combined_results:
+            #     print("Common Image Filename:", image_filename)
 
             return render_template('index.html',
                                    query_path=uploaded_img_path,
                                    scores=combined_results)
-
 
         # product quantization
         elif search_type == 'pq':
