@@ -8,7 +8,6 @@ from pathlib import Path
 import nltk
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
-from sklearn.feature_extraction.text import TfidfVectorizer
 import pickle
 import logging
 import json
@@ -42,6 +41,10 @@ caption_dict = {}
 # Load the dictionary from the JSON file
 with open('captions.json', 'r') as f:
     caption_dict = json.load(f)
+
+# Read the "captions.txt" file
+with open('captions.txt', 'r') as captions_file:
+    lines = captions_file.readlines()
 
 
 @app.route('/', methods=['GET', 'POST'])
@@ -77,7 +80,7 @@ def index():
                             continue
                 combined_results.append((score / 2, Path.__fspath__(path)))
 
-            combined_results = sorted(combined_results, key=lambda x: x[0], reverse=True)[:60]
+            combined_results = sorted(combined_results, key=lambda x: x[0], reverse=True)[:200]
 
             http_result = []
             for result in combined_results:
@@ -93,66 +96,86 @@ def index():
 
         elif search_type == 'tfidf':
             # Load the TF-IDF vectorizer and the TF-IDF matrix from disk
-            with open('tfidf_vectorizer.pkl', 'rb') as f:
+            with open('tfidf_vectorizer.pickle', 'rb') as f:
                 vectorizer = pickle.load(f)
-            with open('tfidf_matrix.pkl', 'rb') as f:
+            with open('tfidf_matrix.pickle', 'rb') as f:
                 tfidf_matrix = pickle.load(f)
 
             # Preprocess the query text
             query_text = query_text.lower()
+            print(query_text)
             words = word_tokenize(query_text)
             stop_words = set(stopwords.words('english'))
             words = [word for word in words if word.isalnum() and word not in stop_words]
             query_text = ' '.join(words)
 
-            # Compute the TF-IDF vector for the query text
-            query_tfidf = vectorizer.transform([query_text])
+            # Preprocess user input
+            user_input_vector = vectorizer.transform([query_text])
 
-            # Compute cosine similarities between the query vector and all captions
-            similarities = np.dot(tfidf_matrix, query_tfidf.T).toarray().flatten()
+            # Compute cosine similarities between user input and captions
+            similarities = np.dot(tfidf_matrix, user_input_vector.T).toarray().flatten()
 
             # Rank captions based on similarity scores
-            ranked_indices = np.argsort(similarities)[::-1][:200]
+            ranked_indices = np.argsort(similarities)[::-1][:150]
 
-            # Get top n_results captions with their similarity scores
+            # Retrieve the top 50 image filenames and captions
             tfidf_results = []
             for idx in ranked_indices:
-                similarity_score = similarities[idx]
-                print(idx)
-                # caption = lines[str(idx) + ".jpg"]
-                caption = lines[idx]
-                print(caption)
-                # tfidf_results.append((similarity_score, caption))
+                image_filename = lines[idx].split(',')[0]
+                caption = lines[idx].split(',')[1]
+                tfidf_results.append(((Path("./static/img") / image_filename), caption))
+                # print(Path("./static/img") / image_filename, caption)
 
+            print("============================")
             # Run search for images
             query = fe.extract(img)
             dists = np.linalg.norm(features - query, axis=1)  # L2 distances to features
-            ids = np.argsort(dists)[:200]
-            unstructured_scores = [(dists[id], img_paths[id]) for id in ids]
+            ids = np.argsort(dists)[:300]
+            unstructured_result = [(dists[id], img_paths[id]) for id in ids]
 
-            # Combine structured and unstructured results and sort by score
-            combined_results = []
-            for s_score, caption in tfidf_results:
-                for u_score, path in unstructured_scores:
-                    if Path.__fspath__(path) == caption.replace("\n", ""):
-                        with Image.open(path) as img:
-                            # 获取图像的宽度和高度
-                            width, height = img.size
-                            if query_size != "":
-                                if str(width) + "*" + str(height) != query_size:
-                                    continue
-                        combined_results.append(((s_score + u_score) / 2, Path.__fspath__(path)))
+            # Iterate through unstructured_result
+            # for score, img_path in unstructured_result:
+                # Access the distance and image path for each element
+                # print("Distance:", score)
+                # print("Image Path:", img_path)
+                # Perform further processing or operations with the distance and image path
+
+            # Find the intersection of image filenames in tfidf_results and img_path in unstructured_result
+            intersection = []
+
+            for filename, caption in tfidf_results:
+                # Find the corresponding score in unstructured_result
+                score = None
+                for dist, img_path in unstructured_result:
+                    if img_path == filename:
+                        score = dist
                         break
+                intersection.append((filename, caption, score))
+            # Iterate through the intersection
+            # for image_filename in intersection:
+            #     # Access the image filename and perform further processing or operations
+            #     print("Common Image Filename:", image_filename)
 
-            combined_results = sorted(combined_results, key=lambda x: x[0], reverse=True)[:100]
+            combined_results = []
 
-            http_result = []
-            for result in combined_results:
-                http_result.append((lines[result[1].replace("static\\img\\", "")], result[1]))
+            for image_filename, caption, score in intersection:
+                with Image.open(image_filename) as img:
+                    # 获取图像的宽度和高度
+                    width, height = img.size
+                    if query_size != "":
+                        if str(width) + "*" + str(height) != query_size:
+                            continue
+                combined_results.append((image_filename, caption, score))
+                print(" result: ", image_filename)
+                break
+
+            combined_results = sorted(combined_results, key=lambda x: x[2], reverse=True)[:30]
+
+            combined_results = [(image_filename, caption) for image_filename, caption, _ in combined_results]
 
             return render_template('index.html',
                                    query_path=uploaded_img_path,
-                                   scores=http_result)
+                                   scores=combined_results)
 
 
         # product quantization
