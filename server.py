@@ -160,12 +160,12 @@ def index():
                 for i, item in enumerate(intersection):
                     if item[0] == filename:
                         # Create a new tuple with the updated score
-                        new_item = (item[0], item[1], max(item[2], score/2))
+                        new_item = (item[0], item[1], max(item[2], score/2) + 0.05)
                         # Replace the old tuple with the new tuple
                         intersection[i] = new_item
                         break
-                else:
-                    intersection.append((filename, caption_dict[filename.name][0], score / 2))
+                # else:
+                #     intersection.append((filename, caption_dict[filename.name][0], score / 2))
 
             print("===============")
             combined_results = sorted(intersection, key=lambda x: x[2], reverse=True)[:50]
