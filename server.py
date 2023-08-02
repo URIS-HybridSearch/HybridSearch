@@ -153,41 +153,26 @@ def index():
                         intersection.append((filename, caption, score))
                         break
 
-            # Iterate through the intersection
-            # for image_filename in intersection:
-            #     # Access the image filename and perform further processing or operations
-            #     print("Common Image Filename:", image_filename)
-            # print("A--------")
-            # combined_results = []
-            #
-            # for image_filename, caption, score in intersection:
-            #     with Image.open(image_filename) as img:
-            #         # 获取图像的宽度和高度
-            #         width, height = img.size
-            #         if query_size != "":
-            #             if str(width) + "*" + str(height) != query_size:
-            #                 continue
-            #     combined_results.append((image_filename, caption, score))
-            #     print((image_filename, caption, score))
-            #     # print(" result: ", image_filename)
-            #     break
-            #
-            # # for image_filename, caption, score in combined_results:
-            # #     print("Common Image Filename:", image_filename)
-            #
-            # print("B===================")
             combined_results = sorted(intersection, key=lambda x: x[2], reverse=True)[:30]
             for image_filename, a, b in intersection:
                 # Access the image filename and perform further processing or operations
                 print("Common Image Filename:", image_filename)
-            combined_results = [(caption, image_filename) for image_filename, caption, _ in combined_results]
+            # combined_results = [(caption, image_filename) for image_filename, caption, _ in combined_results]
 
-            # for image_filename, caption in combined_results:
-            #     print("Common Image Filename:", image_filename)
+            http_results = []
+            for image_filename, caption, _ in combined_results:
+                with Image.open(image_filename) as img:
+                    width, height = img.size
+                    if query_size != "":
+                        if str(width) + "*" + str(height) != query_size:
+                            continue
+                http_results.append((caption, image_filename))
+                print("http result: ", caption, image_filename)
+
 
             return render_template('index.html',
                                    query_path=uploaded_img_path,
-                                   scores=combined_results)
+                                   scores=http_results)
 
         # product quantization
         elif search_type == 'pq':
