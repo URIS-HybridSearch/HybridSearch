@@ -117,24 +117,31 @@ def index():
             similarities = np.dot(tfidf_matrix, user_input_vector.T).toarray().flatten()
 
             # Rank captions based on similarity scores
-            ranked_indices = np.argsort(similarities)[::-1][:500]
+            ranked_indices = np.argsort(similarities)[::-1][:100]
 
-            # Retrieve the top 50 image filenames and captions
+            unique_filenames = set()
+
+            # Retrieve the top 500 image filenames and captions
             tfidf_results = []
             for idx in ranked_indices:
+
                 image_filename = lines[idx].split(',')[0]
+                if image_filename in unique_filenames:
+                    continue
                 caption = lines[idx].split(',')[1]
-                tfidf_results.append(((Path("./static/img") / image_filename), caption))
-                print(Path("./static/img") / image_filename, caption)
+                similarities_score = similarities[idx]
+                unique_filenames.add(image_filename)
+                tfidf_results.append(((Path("./static/img") / image_filename), caption, similarities_score))
+                # print(Path("./static/img") / image_filename, caption)
 
             print("============================")
             # Run search for images
             query = fe.extract(img)
             dists = np.linalg.norm(features - query, axis=1)  # L2 distances to features
-            ids = np.argsort(dists)[:500]
+            ids = np.argsort(dists)[:100]
             unstructured_result = [(dists[id], img_paths[id]) for id in ids]
 
-            # Iterate through unstructured_result
+            # test: Iterate through unstructured_result
             # for score, img_path in unstructured_result:
                 # Access the distance and image path for each element
                 # print("Distance:", score)
@@ -144,30 +151,35 @@ def index():
             # Find the intersection of image filenames in tfidf_results and img_path in unstructured_result
             intersection = []
 
-            for filename, caption in tfidf_results:
-                # Find the corresponding score in unstructured_result
-                score = None
-                for dist, img_path in unstructured_result:
-                    if img_path == filename:
-                        score = dist
-                        intersection.append((filename, caption, score))
-                        break
+            for filename, caption, score in tfidf_results:
+                intersection.append((filename, caption, score))
+                # print("tfidf score:", score)
 
-            combined_results = sorted(intersection, key=lambda x: x[2], reverse=True)[:30]
+            for score, filename in unstructured_result:
+                # print("image score: ", score)
+                for item in intersection:
+                    if item[0] == filename:
+                        item = (item[0], item[1], item[2] + score / 2)
+                        break
+                else:
+                    intersection.append((filename, caption_dict[filename.name][0], score / 2))
+
+
+            combined_results = sorted(intersection, key=lambda x: x[2], reverse=True)[:50]
             for image_filename, a, b in intersection:
                 # Access the image filename and perform further processing or operations
-                print("Common Image Filename:", image_filename)
+                print("Common Image Filename:", image_filename, a, b)
             # combined_results = [(caption, image_filename) for image_filename, caption, _ in combined_results]
 
             http_results = []
-            for image_filename, caption, _ in combined_results:
+            for image_filename, caption, score in combined_results:
                 with Image.open(image_filename) as img:
                     width, height = img.size
                     if query_size != "":
                         if str(width) + "*" + str(height) != query_size:
                             continue
                 http_results.append((caption, image_filename))
-                print("http result: ", caption, image_filename)
+                # print("http result: ", caption, image_filename, score)
 
 
             return render_template('index.html',

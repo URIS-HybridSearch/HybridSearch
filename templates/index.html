@@ -7,7 +7,7 @@
     </head>
     <body>
         <div class="container">
-            <h1>Image and Text Hybrid Search Engine</h1>
+            <h1>Image and Text Search Engine</h1>
             <div class="row">
                 <div class="col-md-6">
                     <form method="POST" enctype="multipart/form-data" action="/">
@@ -17,63 +17,22 @@
                         </div>
                         <div class="form-group">
                             <label for="query_text">Contains text:</label>
-                            <input type="text" class="form-control" id="query_text" name="query_text" disabled>
+                            <input type="text" class="form-control" id="query_text" name="query_text">
                         </div>
                         <div class="form-group">
-                            <label for="query_size">Specify size:</label>
-                            <select class="form-control" id="query_size" name="query_size" disabled>
-                                <option id="any" value="any"></option>
-                                <option id="500*375" value="500*375">500*375</option>
-                                <option id="375*500" value="375*500">375*500</option>
-                                <option id="500*333" value="500*333">500*333</option>
-                                <option id="333*500" value="333*500">333*500</option>
-                                <option id="other" value="other">Other</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="anns_method">ANNs method:</label>
-                            <select class="form-control" id="anns_method" name="anns_method">
-                                <option id="VP-Tree" value="VP-Tree">VP-Tree</option>
-                                <option id="product quantization 8" value="product quantization 8">product quantization with M = 8</option>
-                                <option id="product quantization 16" value="product quantization 16">product quantization with M = 16</option>
-                                <option id="product quantization 32" value="product quantization 32">product quantization with M = 32</option>
-
-                            </select>
+                            <label for="query_size">Specify size (e.g. 500*375):</label>
+                            <input type="text" class="form-control" id="query_size" name="query_size">
                         </div>
                         <div class="form-group">
                             <label for="search_type">Search by:</label>
                             <select class="form-control" id="search_type" name="search_type">
-                                <option id="no filtering" value="no filtering">no filtering</option>
-                                <option id="pre-query filtering" value="pre-query filtering">pre-query filtering</option>
-                                <option id="post-query filtering" value="post-query filtering">post-query filtering</option>
-                                <option id="concurrent filtering" value="concurrent filtering">concurrent filtering</option>
+                                <option value="normal">Hybrid Search (Structured text search)</option>
+                                <option value="tfidf">Unstructured text search</option>
+<!--                                <option value="vptree">Hybrid Search with VP Tree</option>-->
+<!--                                <option value="pq">Hybrid Search with Product Quantization</option>-->
                             </select>
                         </div>
-                        <div class="form-group">
-                            <label for="database_size">Database size:</label>
-                            <select class="form-control" id="database_size" name="database_size">
-                                <option id="d100" value="100">100 images</option>
-                                <option id="d500" value="500">500 images</option>
-                                <option id="d2000" value="2000">2000 images</option>
-                                <option id="d8091" value="8091">8091 images</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="num_results">Number of results wanted:</label>
-                            <select class="form-control" id="num_results" name="num_results">
-                                <option id="n10" value="10">10 images</option>
-                                <option id="n20" value="20">20 images</option>
-                                <option id="n50" value="50">50 images</option>
-{#                                <option id="n100" value="100">100 images</option>#}
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label id="search_time"></label>
-                        </div>
-                        <div class="form-group">
-                            <label id="indexing_time"></label>
-                        </div>
-                        <button id="submit" type="submit" class="btn btn-primary" disabled>Search</button>
+                        <button type="submit" class="btn btn-primary">Search</button>
                     </form>
                 </div>
                 <div class="col-md-6">
@@ -88,7 +47,7 @@
             </div>
             <div class="row">
                 <div class="col-md-12">
-                    <h2 id="results">Results:</h2>
+                    <h2>Results:</h2>
                 </div>
                 {% for score in scores %}
                 <div class="col-md-4">
@@ -100,69 +59,5 @@
                 {% endfor %}
             </div>
         </div>
-        <script>
-            var num_results = "{{ num_results }}";
-            var results_label = document.getElementById("results");
-            if(num_results == "0"){
-                results_label.textContent = "No results found.";
-            }else if(num_results == ""){
-                results_label.textContent = "";
-            }else{
-                results_label.textContent = num_results + " results found.";
-            }
-            var img_input = document.getElementById("query_img");
-            img_input.addEventListener("change", enable_search);
-            function enable_search(){
-                button = document.getElementById("submit");
-                button.disabled = false
-            }
-
-            var search_time = "{{ search_time }}";
-            var label1 = document.getElementById("search_time");
-            label1.innerText = search_time;
-            label1.style.color = "red";
-
-            var indexing_time = "{{ indexing_time }}";
-            var label2 = document.getElementById("indexing_time");
-            label2.innerText = indexing_time;
-            label2.style.color = "blue";
-
-            var default_mode = "{{ default_mode }}";
-            var mode_default_option = document.getElementById(default_mode);
-            mode_default_option.selected = true;
-            var default_database_size = document.getElementById("d"+"{{ default_database_size }}");
-            default_database_size.selected = true;
-            var default_num_results = document.getElementById("n"+"{{ default_num_results }}");
-            default_num_results.selected = true;
-
-            var search_type_select = document.getElementById("search_type");
-            var text_input = document.getElementById("query_text");
-            var size_select = document.getElementById("query_size");
-            text_input.value = "{{ default_text }}"
-
-            var default_size = "{{ default_size }}"
-            var size_default_option = document.getElementById(default_size);
-            size_default_option.selected = true;
-            search_type_select.addEventListener("change", updateInputState);
-
-            function updateInputState() {
-                if (search_type_select.value != "no filtering") {
-                    text_input.disabled = false;
-                    size_select.disabled = false;
-                } else {
-                    text_input.disabled = true;
-                    size_select.disabled = true;
-                }
-            }
-
-            if (mode_default_option.value === "no filtering"){
-                text_input.disabled = true;
-                size_select.disabled = true;
-            } else {
-                text_input.disabled = false;
-                size_select.disabled = false;
-            }
-
-        </script>
     </body>
 </html>
