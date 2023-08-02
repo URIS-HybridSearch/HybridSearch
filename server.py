@@ -117,7 +117,7 @@ def index():
             similarities = np.dot(tfidf_matrix, user_input_vector.T).toarray().flatten()
 
             # Rank captions based on similarity scores
-            ranked_indices = np.argsort(similarities)[::-1][:100]
+            ranked_indices = np.argsort(similarities)[::-1][:50]
 
             unique_filenames = set()
 
@@ -138,7 +138,7 @@ def index():
             # Run search for images
             query = fe.extract(img)
             dists = np.linalg.norm(features - query, axis=1)  # L2 distances to features
-            ids = np.argsort(dists)[:100]
+            ids = np.argsort(dists)[:200]
             unstructured_result = [(dists[id], img_paths[id]) for id in ids]
 
             # test: Iterate through unstructured_result
@@ -153,18 +153,21 @@ def index():
 
             for filename, caption, score in tfidf_results:
                 intersection.append((filename, caption, score))
-                # print("tfidf score:", score)
+                print("tfidf score:", score)
 
             for score, filename in unstructured_result:
-                # print("image score: ", score)
-                for item in intersection:
+                print("image score: ", score)
+                for i, item in enumerate(intersection):
                     if item[0] == filename:
-                        item = (item[0], item[1], item[2] + score / 2)
+                        # Create a new tuple with the updated score
+                        new_item = (item[0], item[1], max(item[2], score/2))
+                        # Replace the old tuple with the new tuple
+                        intersection[i] = new_item
                         break
                 else:
                     intersection.append((filename, caption_dict[filename.name][0], score / 2))
 
-
+            print("===============")
             combined_results = sorted(intersection, key=lambda x: x[2], reverse=True)[:50]
             for image_filename, a, b in intersection:
                 # Access the image filename and perform further processing or operations
@@ -178,7 +181,7 @@ def index():
                     if query_size != "":
                         if str(width) + "*" + str(height) != query_size:
                             continue
-                http_results.append((caption, image_filename))
+                http_results.append((caption + ": "+ str(score), image_filename))
                 # print("http result: ", caption, image_filename, score)
 
 
