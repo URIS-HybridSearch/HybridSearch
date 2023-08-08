@@ -6,11 +6,14 @@ from datetime import datetime
 from flask import Flask, request, render_template
 from pathlib import Path
 import nltk
+import os
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 import pickle
 import logging
 import json
+import time
+from memory_profiler import memory_usage
 
 # download stopwords and punkt
 nltk.download('stopwords')
@@ -49,12 +52,26 @@ with open('captions.txt', 'r') as captions_file:
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
+    start_time = time.time()
+    mem_before = memory_usage()[0]
 
     if request.method == 'POST':
+
+        # if request.files['query_img'] == '':
+        #     return render_template('index.html')
+
         query_img = request.files['query_img']
         query_text = request.form['query_text']
         query_size = request.form['query_size']
         search_type = request.form['search_type']
+
+        # file_extension = os.path.splitext(query_img)[1]
+        # if file_extension.lower() not in ['.jpg', '.jpeg', '.png']:
+        #     return render_template('index.html')
+
+        print("query_image: ", query_img)
+
+
 
         # Save query image in the folder.
         img = Image.open(query_img.stream)  # PIL image
@@ -72,7 +89,7 @@ def index():
             # Combine structured and unstructured results and sort by score
             combined_results = []
             for score, path in unstructured_scores:
-                print(path)
+                # print(path)
                 with Image.open(path) as img:
                     # 获取图像的宽度和高度
                     width, height = img.size
@@ -138,29 +155,25 @@ def index():
             # Run search for images
             query = fe.extract(img)
             dists = np.linalg.norm(features - query, axis=1)  # L2 distances to features
-            ids = np.argsort(dists)[:200]
+            ids = np.argsort(dists)[:100]
             unstructured_result = [(dists[id], img_paths[id]) for id in ids]
-
-            # test: Iterate through unstructured_result
-            # for score, img_path in unstructured_result:
-                # Access the distance and image path for each element
-                # print("Distance:", score)
-                # print("Image Path:", img_path)
-                # Perform further processing or operations with the distance and image path
 
             # Find the intersection of image filenames in tfidf_results and img_path in unstructured_result
             intersection = []
 
             for filename, caption, score in tfidf_results:
-                intersection.append((filename, caption, score))
-                print("tfidf score:", score)
+                if query is not None:
+                    if score > 0:
+                        intersection.append((filename, caption, score))
+                else:
+                    intersection.append((filename, caption, score))
 
             for score, filename in unstructured_result:
-                print("image score: ", score)
+                # print("image score: ", score)
                 for i, item in enumerate(intersection):
                     if item[0] == filename:
                         # Create a new tuple with the updated score
-                        new_item = (item[0], item[1], max(item[2], score/2) + 0.05)
+                        new_item = (item[0], item[1], item[2] + 0.05)
                         # Replace the old tuple with the new tuple
                         intersection[i] = new_item
                         break
@@ -245,6 +258,15 @@ def index():
             return render_template('index.html',
                                    query_path=uploaded_img_path,
                                    scores=http_result)
+
+        mem_after = memory_usage()[0]
+        end_time = time.time()
+
+        time_taken = end_time - start_time
+        mem_consumed = mem_after - mem_before
+
+        print(f"Time taken: {time_taken:.6f} seconds")
+        print(f"Memory consumed: {mem_consumed:.2f} MiB")
 
         return render_template('index.html')
 
