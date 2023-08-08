@@ -1,7 +1,2 @@
-/.idea/*
-/__pycache__/*
-/static/*
-!/static/.gitkeep
-!/static/code
-*.iml
-.idea/misc.xml
+/static/img/*
+!.gitkeep
