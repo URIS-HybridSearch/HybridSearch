@@ -5,11 +5,12 @@ from scipy.spatial.distance import cdist
 from feature_extractor import FeatureExtractor
 from PIL import Image
 from pathlib import Path
+import sys
 
 np.set_printoptions(threshold=np.inf, linewidth=np.inf)
 
 class ProductQuantizer:
-    def __init__(self, num_clusters=256, num_subvectors=4):
+    def __init__(self, num_clusters=256):
         self.num_clusters = num_clusters
         # self.num_subvectors = num_subvectors
         # self.codebooks = [MiniBatchKMeans(n_clusters=num_clusters) for _ in range(num_subvectors)]
@@ -22,30 +23,58 @@ class ProductQuantizer:
         for m in range(M):
             # print(vec[m])
             vec_sub = vec[m*Ds:(m+1)*Ds].reshape(-1, 1)
-            codeword[m], label = kmeans2(vec_sub, 256)
-            print("codeword[m]: ", codeword[m].shape)
-            print("label: ",label.shape)
-
+            codeword[m], label = kmeans2(vec_sub, 256, minit='random')
+            print("Cluster No. ", m)
         return codeword
 
+#
+# if __name__ == '__main__':
+#     fe = FeatureExtractor()
+#     pq = ProductQuantizer(num_clusters=256)
+#
+#     features = []
+#
+#     for i, img_path in enumerate(sorted(Path("./static/img").glob("*.jpg"))):
+#         print(img_path)  # e.g., ./static/img/xxx.jpg
+#
+#         # Extract deep feature from image
+#         feature = fe.extract(img=Image.open(img_path))
+#
+#         # Quantize deep feature using product quantization
+#         quantized_feature = pq.train(feature, 4)
+#
+#         # Save quantized feature to disk
+#         feature_path = Path("./static/code") / (img_path.stem + ".npy")  # e.g., ./static/feature/xxx.npy
+#         # print("feature:", quantized_feature[0])
+#         np.save(feature_path, quantized_feature[0])
 
 if __name__ == '__main__':
     fe = FeatureExtractor()
-    pq = ProductQuantizer(num_clusters=256, num_subvectors=4)
+    pq = ProductQuantizer(num_clusters=256)
+    num_vectors = 3000  # Number of vectors to concatenate
+
+    features = []  # List to store extracted features
 
     for i, img_path in enumerate(sorted(Path("./static/img").glob("*.jpg"))):
-        print(img_path)  # e.g., ./static/img/xxx.jpg
+        # print(img_path)  # e.g., ./static/img/xxx.jpg
 
         # Extract deep feature from image
         feature = fe.extract(img=Image.open(img_path))
-        # print(feature)
-        # assert 1==2
-        print("Feature shape:", feature.shape)
+        features.append(feature)  # Append feature to the list
 
-        # Quantize deep feature using product quantization
-        quantized_feature = pq.train(feature, 4)
+        if len(features) == num_vectors:
+            # Concatenate the features and obtain an array of arrays
+            concatenated_features = np.array(features)
+            print(concatenated_features.shape)
 
+            # Reset the features list for the next batch
+            features = []
+            break
 
-        # Save quantized feature to disk
-        # feature_path = Path("./static/code") / (img_path.stem + ".npy")  # e.g., ./static/feature/xxx.npy
-        # np.save(feature_path, quantized_feature)
+    # Quantize deep feature using product quantization
+    quantized_feature = pq.train(feature, 4)
+
+    # Save quantized feature to disk
+    feature_path = Path("./static/code") / ("all_code" + ".npy")  # e.g., ./static/feature/xxx.npy
+    # print("feature:", quantized_feature[0])
+    np.save(feature_path, quantized_feature)
