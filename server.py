@@ -32,19 +32,20 @@ with open('captions.txt', 'r') as f:
         lines[temp[0]] = temp[1]
 
 indices = {}
+
+
 @app.route('/', methods=['GET', 'POST'])
 def index():
     if request.method == 'POST':
-        print(request.form)
-        query_img = request.files['query_img']
-        try:
-            query_text = request.form['query_text']
-            query_size = request.form['query_size']
-        except Exception as e:
-            pass
-        search_type = request.form['search_type']
+        query_img = request.files.get('query_img')
+        query_text = request.form.get('query_text')
+        query_size = request.form.get('query_size')
+        search_type = request.form.get('search_type')
 
+        if query_text is None and query_size is None:
+            search_type = "no filtering"
         utils.mode = search_type
+        
         # Save query image
         img = Image.open(query_img.stream)  # PIL image
         uploaded_img_path = "static/uploaded/" + datetime.now().isoformat().replace(":", ".") + "_" + query_img.filename
@@ -60,7 +61,7 @@ def index():
                                                     name=Path.__fspath__(img_paths[i])) for i in range(len(img_paths))])
             utils.t4 = time.time()
             indices["full_model"] = full_model
-            
+
         utils.t1 = time.time()
         result = indices["full_model"].knn_search(query, 10)
         utils.t2 = time.time()
@@ -93,11 +94,11 @@ def index():
         return render_template('index.html',
                                query_path=uploaded_img_path,
                                scores=http_result,
-                               search_time = "Query time: " + str(round(1000 * (utils.t2 - utils.t1))) + "ms",
-                               indexing_time = "Indexing time: " + index_time + "ms"
+                               search_time="Query time: " + str(round(1000 * (utils.t2 - utils.t1))) + "ms",
+                               indexing_time="Indexing time: " + index_time + "ms"
                                if index_time != "0" else
                                "Index is already built.",
-                               default_mode = utils.mode)
+                               default_mode=utils.mode)
     else:
         return render_template('index.html')
 
