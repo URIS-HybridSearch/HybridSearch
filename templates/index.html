@@ -84,9 +84,9 @@
             label2.style.color = "blue";
 
             var default_mode = "{{ default_mode }}";
-            var default_option = document.getElementById(default_mode);
+            var default_option = document.getElementById("search_type");
             default_option.selected = true;
-            updateInputState();
+
             var select = document.getElementById("search_type");
             var input1 = document.getElementById("query_text");
             var input2 = document.getElementById("query_size");
@@ -94,6 +94,7 @@
             select.addEventListener("change", updateInputState);
 
             function updateInputState() {
+                console.log("emmmm");
                 if (select.value != "no filtering") {
                     input1.disabled = false;
                     input2.disabled = false;
@@ -101,6 +102,14 @@
                     input1.disabled = true;
                     input2.disabled = true;
                 }
+            }
+
+            if (default_option === "no filtering"){
+                input1.disabled = true;
+                input2.disabled = true;
+            } else {
+                input1.disabled = false;
+                input2.disabled = false;
             }
         </script>
     </body>
