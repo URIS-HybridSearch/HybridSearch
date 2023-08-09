@@ -15,11 +15,11 @@ app = Flask(__name__)
 # Read image features
 fe = FeatureExtractor()
 features = []
-utils.img_paths = []
+img_paths = []
 cnt = 0
 for feature_path in Path("./static/feature").glob("*.npy"):
     features.append(np.load(Path.__fspath__(feature_path)))
-    utils.img_paths.append(Path("./static/img") / (feature_path.stem + ".jpg"))
+    img_paths.append(Path("./static/img") / (feature_path.stem + ".jpg"))
     cnt += 1
     if cnt == 100:
         break
@@ -57,7 +57,7 @@ def index():
             if not "full_model" in indices:
                 utils.t3 = time.time()
                 full_model = vptree.Vptree([point.Point(coordinates=features[i].tolist(),
-                                                        name=Path.__fspath__(utils.img_paths[i])) for i in range(len(utils.img_paths))])
+                                                        name=Path.__fspath__(img_paths[i])) for i in range(len(img_paths))])
                 utils.t4 = time.time()
                 indices["full_model"] = full_model
             utils.t1 = time.time()
@@ -70,11 +70,11 @@ def index():
             else:
                 utils.t3 = time.time()
                 filtered_set = []
-                for i in range(len(utils.img_paths)):
-                    cap = utils.lines[Path.__fspath__(utils.img_paths[i]).replace("static\\img\\", "")]
+                for i in range(len(img_paths)):
+                    cap = utils.lines[Path.__fspath__(img_paths[i]).replace("static\\img\\", "")]
                     if not (utils.query_text in cap):
                         continue
-                    with Image.open(utils.img_paths[i]) as img:
+                    with Image.open(img_paths[i]) as img:
                         width, height = img.size
                         if utils.query_size != "":
                             if str(width) + "*" + str(height) != utils.query_size:
@@ -83,7 +83,7 @@ def index():
                 if len(filtered_set)==0:
                     return render_template('index.html', no_results=1)
                 partial_model = vptree.Vptree([point.Point(coordinates=features[i].tolist(),
-                                                           name=Path.__fspath__(utils.img_paths[i])) for i in filtered_set])
+                                                           name=Path.__fspath__(img_paths[i])) for i in filtered_set])
                 utils.t4 = time.time()
                 indices[criteria] = partial_model
             utils.t1 = time.time()

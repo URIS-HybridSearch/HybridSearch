@@ -10,11 +10,6 @@ class VpNode:
         self.radius = -1
 
     def knn_search(self, query_point, k):
-
-        # print(self.content)
-        # print("maxheap: ", [x.name for x in list(utils.maxheap.queue)])
-        # print("knn_threshold: ", utils.knn_threshold)
-
         if utils.maxheap is None:
             utils.maxheap = PriorityQueue()
         if self.content is None:

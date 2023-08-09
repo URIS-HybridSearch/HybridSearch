@@ -13,8 +13,6 @@ query_size = None
 
 lines = None
 
-img_paths = None
-
 t1 = t2 = t3 = t4 = 0
 
 # number of results wanted

@@ -1,7 +1,8 @@
 from typing import List
 import math
 import utils
-
+from pathlib import Path
+from PIL import Image
 
 class Point:
     def __init__(self, coordinates: List[float], name: str):
@@ -14,7 +15,15 @@ class Point:
 
     def passes_filter(self):
         if utils.mode != "no filtering":
-            return len(self.name) % 2 == 0
+            cap = utils.lines[Path.__fspath__(self.name).replace("static\\img\\", "")]
+            if not (utils.query_text in cap):
+                return False
+            with Image.open(self.name) as img:
+                width, height = img.size
+                if utils.query_size != "":
+                    if str(width) + "*" + str(height) != utils.query_size:
+                        return False
+            return True
         else:
             return True
 
