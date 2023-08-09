@@ -3,3 +3,4 @@
 /static/*
 !/static/.gitkeep
 *.iml
+.idea/misc.xml
