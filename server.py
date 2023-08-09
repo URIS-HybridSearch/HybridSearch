@@ -46,7 +46,7 @@ def index():
             print("change type")
             search_type = "no filtering"
         utils.mode = search_type
-        
+
         # Save query image
         img = Image.open(query_img.stream)  # PIL image
         uploaded_img_path = "static/uploaded/" + datetime.now().isoformat().replace(":", ".") + "_" + query_img.filename
@@ -56,16 +56,42 @@ def index():
         query = fe.extract(img).tolist()
         query = point.Point(coordinates=query, name="query_point")
 
-        if not "full_model" in indices:
-            utils.t3 = time.time()
-            full_model = vptree.Vptree([point.Point(coordinates=features[i].tolist(),
-                                                    name=Path.__fspath__(img_paths[i])) for i in range(len(img_paths))])
-            utils.t4 = time.time()
-            indices["full_model"] = full_model
-
-        utils.t1 = time.time()
-        result = indices["full_model"].knn_search(query, 10)
-        utils.t2 = time.time()
+        if utils.mode != "pre-query filtering":
+            if not "full_model" in indices:
+                utils.t3 = time.time()
+                full_model = vptree.Vptree([point.Point(coordinates=features[i].tolist(),
+                                                        name=Path.__fspath__(img_paths[i])) for i in range(len(img_paths))])
+                utils.t4 = time.time()
+                indices["full_model"] = full_model
+            utils.t1 = time.time()
+            result = indices["full_model"].knn_search(query, 10)
+            utils.t2 = time.time()
+        else:
+            criteria = query_text + "-" + query_size
+            if criteria in indices:
+                utils.t4 = utils.t3 = 0
+            else:
+                utils.t3 = time.time()
+                filtered_set = []
+                for i in range(len(img_paths)):
+                    cap = lines[Path.__fspath__(img_paths[i]).replace("static\\img\\", "")]
+                    if not (query_text in cap):
+                        continue
+                    with Image.open(img_paths[i]) as img:
+                        width, height = img.size
+                        if query_size != "":
+                            if str(width) + "*" + str(height) != query_size:
+                                continue
+                    filtered_set.append(i)
+                if len(filtered_set)==0:
+                    return render_template('index.html', no_results=1)
+                partial_model = vptree.Vptree([point.Point(coordinates=features[i].tolist(),
+                                                           name=Path.__fspath__(img_paths[i])) for i in filtered_set])
+                utils.t4 = time.time()
+                indices[criteria] = partial_model
+            utils.t1 = time.time()
+            result = indices[criteria].knn_search(query, 10)
+            utils.t2 = time.time()
 
         '''
 
@@ -99,9 +125,10 @@ def index():
                                indexing_time="Indexing time: " + index_time + "ms"
                                if index_time != "0" else
                                "Index is already built.",
-                               default_mode=utils.mode)
+                               default_mode=utils.mode,
+                               no_results=0)
     else:
-        return render_template('index.html')
+        return render_template('index.html', no_results=0)
 
 
 if __name__ == "__main__":

@@ -66,6 +66,10 @@
             </div>
         </div>
         <script>
+            var no_results = "{{ no_results }}";
+            if(no_results == 1){
+                alert("No results found.");
+            }
             var img_input = document.getElementById("query_img");
             img_input.addEventListener("change", enable_search);
             function enable_search(){
