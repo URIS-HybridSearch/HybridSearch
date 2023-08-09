@@ -5,10 +5,17 @@ knn_threshold = None
 
 query_point = None
 
-t1 = t2 = t3 = t4 = 0
+query_img = None
 
-# input file source
-input_path = "C:\\Users\\Sutp\\Desktop\\glove.6B.50d.txt"
+query_text = None
+
+query_size = None
+
+lines = None
+
+img_paths = None
+
+t1 = t2 = t3 = t4 = 0
 
 # number of results wanted
 k_results = 10
