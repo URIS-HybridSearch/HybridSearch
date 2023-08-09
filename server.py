@@ -4,7 +4,7 @@ import time
 import numpy as np
 from PIL import Image
 from flask import Flask, request, render_template
-
+import random
 import point
 import utils
 import vptree
@@ -51,17 +51,28 @@ def index():
 
         # Run search
         query = fe.extract(img).tolist()
-        query = point.Point(coordinates=query, name="query_point")
+        query = point.Point(coordinates=query, src="query_point")
 
         if utils.mode != "pre-query filtering":
             if not "full_model" in indices:
                 utils.t3 = time.time()
                 full_model = vptree.Vptree([point.Point(coordinates=features[i].tolist(),
-                                                        name=Path.__fspath__(img_paths[i])) for i in range(len(img_paths))])
+                                                        src=Path.__fspath__(img_paths[i])) for i in range(len(img_paths))])
                 utils.t4 = time.time()
                 indices["full_model"] = full_model
             utils.t1 = time.time()
-            result = indices["full_model"].knn_search(query, utils.k_results)
+            if utils.mode != "post-query filtering":
+                result = indices["full_model"].knn_search(query, utils.k_results)
+            else:
+                count = 0
+                length = len(img_paths)
+                for i in range(50):
+                    if utils.is_valid(img_paths[random.randint(0,length-1)]):
+                        count += 1
+                p = float(count) / 50
+                search_k = length if utils.k_results / p >= length else round(utils.k_results / p)
+                result = indices["full_model"].knn_search(query, search_k)
+                result.queue = [x for x in result.queue if x.passes_filter()]
             utils.t2 = time.time()
         else:
             criteria = utils.query_text + "-" + utils.query_size
@@ -71,47 +82,19 @@ def index():
                 utils.t3 = time.time()
                 filtered_set = []
                 for i in range(len(img_paths)):
-                    cap = utils.lines[Path.__fspath__(img_paths[i]).replace("static\\img\\", "")]
-                    if not (utils.query_text in cap):
-                        continue
-                    with Image.open(img_paths[i]) as img:
-                        width, height = img.size
-                        if utils.query_size != "":
-                            if str(width) + "*" + str(height) != utils.query_size:
-                                continue
-                    filtered_set.append(i)
+                    if utils.is_valid(i):
+                        filtered_set.append(i)
                 if len(filtered_set)==0:
                     return render_template('index.html', no_results=1)
                 partial_model = vptree.Vptree([point.Point(coordinates=features[i].tolist(),
-                                                           name=Path.__fspath__(img_paths[i])) for i in filtered_set])
+                                                           src=Path.__fspath__(img_paths[i])) for i in filtered_set])
                 utils.t4 = time.time()
                 indices[criteria] = partial_model
             utils.t1 = time.time()
             result = indices[criteria].knn_search(query, utils.k_results)
             utils.t2 = time.time()
 
-        '''
-
-        combined_results = []
-        for score, path in unstructured_scores:
-            if utils.mode == "pre-query filtering":
-                with Image.open(path) as img:
-                    # 获取图像的宽度和高度
-                    width, height = img.size
-                    if utils.query_size != "":
-                        if str(width) + "*" + str(height) != utils.query_size:
-                            continue
-            combined_results.append((score / 2, Path.__fspath__(path)))
-
-        combined_results = sorted(combined_results, key=lambda x: x[0], reverse=True)[:100]
-
-        http_result = []
-        for result in combined_results:
-            cap = utils.lines[result[1].replace("static\\img\\", "")]
-            if utils.query_text in cap:
-                http_result.append((cap, result[1]))
-        '''
-        http_result = [(utils.lines[x.name.replace("static\\img\\", "")], x.name) for x in list(result.queue)]
+        http_result = [(utils.lines[x.path.replace("static\\img\\", "")], x.path) for x in list(result.queue)]
         index_time = str(round(1000 * (utils.t4 - utils.t3)))
         if utils.mode != "pre-query filtering" and index_time != "0":
             utils.t4 = utils.t3 = 0
