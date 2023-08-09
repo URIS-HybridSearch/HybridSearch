@@ -42,7 +42,8 @@ def index():
         query_size = request.form.get('query_size')
         search_type = request.form.get('search_type')
 
-        if query_text is None and query_size is None:
+        if not query_text and not query_size:
+            print("change type")
             search_type = "no filtering"
         utils.mode = search_type
         
