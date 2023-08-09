@@ -17,13 +17,28 @@
                         </div>
                         <div class="form-group">
                             <label for="query_text">Contains text:</label>
-                            <input type="text" class="form-control" id="query_text" name="query_text">
+                            <input type="text" class="form-control" id="query_text" name="query_text" disabled>
                         </div>
                         <div class="form-group">
                             <label for="query_size">Specify size (e.g. 500*375):</label>
-                            <input type="text" class="form-control" id="query_size" name="query_size">
+                            <input type="text" class="form-control" id="query_size" name="query_size" disabled>
                         </div>
-                        <button type="submit" class="btn btn-primary">Search</button>
+                         <div class="form-group">
+                            <label for="search_type">Search by:</label>
+                            <select class="form-control" id="search_type" name="search_type">
+                                <option id="no filtering" value="no filtering">no filtering</option>
+                                <option id="pre-query filtering" value="pre-query filtering">pre-query filtering</option>
+                                <option id="post-query filtering" value="post-query filtering">post-query filtering</option>
+                                <option id="concurrent filtering" value="concurrent filtering">concurrent filtering</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label id="search_time"></label>
+                        </div>
+                        <div class="form-group">
+                            <label id="indexing_time"></label>
+                        </div>
+                        <button id="submit" type="submit" class="btn btn-primary" disabled>Search</button>
                     </form>
                 </div>
                 <div class="col-md-6">
@@ -50,5 +65,43 @@
                 {% endfor %}
             </div>
         </div>
+        <script>
+            var img_input = document.getElementById("query_img");
+            img_input.addEventListener("change", enable_search);
+            function enable_search(){
+                button = document.getElementById("submit");
+                button.disabled = false
+            }
+
+            var search_time = "{{ search_time }}";
+            var label1 = document.getElementById("search_time");
+            label1.innerText = search_time;
+            label1.style.color = "red";
+
+            var indexing_time = "{{ indexing_time }}";
+            var label2 = document.getElementById("indexing_time");
+            label2.innerText = indexing_time;
+            label2.style.color = "blue";
+
+            var default_mode = "{{ default_mode }}";
+            var default_option = document.getElementById(default_mode);
+            default_option.selected = true;
+            updateInputState();
+            var select = document.getElementById("search_type");
+            var input1 = document.getElementById("query_text");
+            var input2 = document.getElementById("query_size");
+
+            select.addEventListener("change", updateInputState);
+
+            function updateInputState() {
+                if (select.value != "no filtering") {
+                    input1.disabled = false;
+                    input2.disabled = false;
+                } else {
+                    input1.disabled = true;
+                    input2.disabled = true;
+                }
+            }
+        </script>
     </body>
 </html>
