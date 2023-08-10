@@ -11,9 +11,9 @@ query_point = None
 
 query_img = None
 
-query_text = None
+query_text = ""
 
-query_size = None
+query_size = ""
 
 lines = None
 

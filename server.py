@@ -102,7 +102,8 @@ def index():
             result = indices[criteria].knn_search(query, utils.k_results)
             utils.t2 = time.time()
 
-        http_result = [(utils.lines[x.path.replace("static\\img\\", "")], x.path) for x in list(result.queue)]
+        http_result = [(utils.lines[x.path.replace("static\\img\\", "")], x.path)
+                       for x in sorted(list(result.queue), reverse=True)]
         index_time = str(round(1000 * (utils.t4 - utils.t3)))
         if utils.mode != "pre-query filtering" and index_time != "0":
             utils.t4 = utils.t3 = 0
