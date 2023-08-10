@@ -82,7 +82,7 @@ def index():
                 utils.t3 = time.time()
                 filtered_set = []
                 for i in range(len(img_paths)):
-                    if utils.is_valid(i):
+                    if utils.is_valid(img_paths[i]):
                         filtered_set.append(i)
                 if len(filtered_set)==0:
                     return render_template('index.html', no_results=1)
