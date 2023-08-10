@@ -35,7 +35,11 @@ def index():
     if request.method == 'POST':
         utils.query_img = request.files.get('query_img')
         utils.query_text = request.form.get('query_text')
+        if utils.query_text is None:
+            utils.query_text = ""
         utils.query_size = request.form.get('query_size')
+        if utils.query_size is None:
+            utils.query_size = ""
         utils.mode = request.form.get('search_type')
         utils.database_size = int(request.form.get("database_size"))
         utils.k_results = int(request.form.get("num_results"))
