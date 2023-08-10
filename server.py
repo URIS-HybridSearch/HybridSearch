@@ -87,7 +87,11 @@ def index():
                     if utils.is_valid(img_paths[i]):
                         filtered_set.append(i)
                 if len(filtered_set) == 0:
-                    return render_template('index.html', n_results="0")
+                    return render_template('index.html',
+                                           n_results="0",
+                                           default_mode=utils.mode,
+                                           default_database_size=utils.database_size,
+                                           default_num_results=utils.k_results,)
                 partial_model = vptree.Vptree([point.Point(coordinates=features[i].tolist(),
                                                            src=Path.__fspath__(img_paths[i])) for i in filtered_set])
                 utils.t4 = time.time()
