@@ -121,7 +121,8 @@
             var select = document.getElementById("search_type");
             var input1 = document.getElementById("query_text");
             var input2 = document.getElementById("query_size");
-
+            input1.value = "{{ default_text }}"
+            input2.value = "{{ default_size }}"
             select.addEventListener("change", updateInputState);
 
             function updateInputState() {
@@ -142,6 +143,7 @@
                 input1.disabled = false;
                 input2.disabled = false;
             }
+
         </script>
     </body>
 </html>

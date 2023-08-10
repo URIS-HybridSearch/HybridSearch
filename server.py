@@ -89,6 +89,8 @@ def index():
                 if len(filtered_set) == 0:
                     return render_template('index.html',
                                            num_results="0",
+                                           default_text=utils.query_text,
+                                           default_size=utils.query_size,
                                            default_mode=utils.mode,
                                            default_database_size=utils.database_size,
                                            default_num_results=utils.k_results,)
@@ -111,13 +113,19 @@ def index():
                                indexing_time="Indexing time: " + index_time + "ms"
                                if index_time != "0" else
                                "Index is already built.",
+                               default_text=utils.query_text,
+                               default_size=utils.query_size,
                                default_mode=utils.mode,
                                default_database_size=utils.database_size,
                                default_num_results=utils.k_results,
                                num_results=str(len(http_result)))
     else:
-        return render_template('index.html', num_results="", default_mode="no filtering",
-                               default_database_size=100, default_num_results=10)
+        return render_template('index.html', num_results="",
+                               default_mode="no filtering",
+                               default_text="",
+                               default_size="",
+                               default_database_size=100,
+                               default_num_results=10)
 
 
 if __name__ == "__main__":
