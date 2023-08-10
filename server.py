@@ -16,13 +16,9 @@ app = Flask(__name__)
 fe = FeatureExtractor()
 features = []
 img_paths = []
-cnt = 0
 for feature_path in Path("./static/feature").glob("*.npy"):
     features.append(np.load(Path.__fspath__(feature_path)))
     img_paths.append(Path("./static/img") / (feature_path.stem + ".jpg"))
-    cnt += 1
-    if cnt == 100:
-        break
 features = np.array(features)
 
 utils.lines = {}
@@ -41,12 +37,15 @@ def index():
         utils.query_text = request.form.get('query_text')
         utils.query_size = request.form.get('query_size')
         utils.mode = request.form.get('search_type')
+        utils.database_size = int(request.form.get("database_size"))
+        utils.k_results = int(request.form.get("num_results"))
 
         if not utils.query_text and not utils.query_size:
             utils.mode = "no filtering"
         # Save query image
         img = Image.open(utils.query_img.stream)  # PIL image
-        uploaded_img_path = "static/uploaded/" + datetime.now().isoformat().replace(":", ".") + "_" + utils.query_img.filename
+        uploaded_img_path = "static/uploaded/" + datetime.now()\
+            .isoformat().replace(":", ".") + "_" + utils.query_img.filename
         img.save(uploaded_img_path)
 
         # Run search
@@ -54,38 +53,41 @@ def index():
         query = point.Point(coordinates=query, src="query_point")
 
         if utils.mode != "pre-query filtering":
-            if not "full_model" in indices:
+            full_model_name = "full_model" + "_" + str(utils.database_size)
+            if full_model_name not in indices:
                 utils.t3 = time.time()
                 full_model = vptree.Vptree([point.Point(coordinates=features[i].tolist(),
-                                                        src=Path.__fspath__(img_paths[i])) for i in range(len(img_paths))])
+                                                        src=Path.__fspath__(img_paths[i])) for i in
+                                            range(utils.database_size)])
                 utils.t4 = time.time()
-                indices["full_model"] = full_model
+                indices[full_model_name] = full_model
             utils.t1 = time.time()
             if utils.mode != "post-query filtering":
-                result = indices["full_model"].knn_search(query, utils.k_results)
+                result = indices[full_model_name].knn_search(query, utils.k_results)
             else:
                 count = 0
-                length = len(img_paths)
                 for i in range(50):
-                    if utils.is_valid(img_paths[random.randint(0,length-1)]):
+                    if utils.is_valid(img_paths[random.randint(0, utils.database_size - 1)]):
                         count += 1
-                p = float(count) / 50
-                search_k = length if utils.k_results / p >= length else round(utils.k_results / p)
-                result = indices["full_model"].knn_search(query, search_k)
+                search_k = utils.database_size
+                if count != 0:
+                    p = float(count) / 50
+                    search_k = min(utils.k_results / p, utils.database_size)
+                result = indices[full_model_name].knn_search(query, search_k)
                 result.queue = [x for x in result.queue if x.passes_filter()]
             utils.t2 = time.time()
         else:
-            criteria = utils.query_text + "-" + utils.query_size
+            criteria = utils.query_text + "_" + utils.query_size + "_" + str(utils.database_size)
             if criteria in indices:
                 utils.t4 = utils.t3 = 0
             else:
                 utils.t3 = time.time()
                 filtered_set = []
-                for i in range(len(img_paths)):
+                for i in range(utils.database_size):
                     if utils.is_valid(img_paths[i]):
                         filtered_set.append(i)
-                if len(filtered_set)==0:
-                    return render_template('index.html', no_results=1)
+                if len(filtered_set) == 0:
+                    return render_template('index.html', n_results="0")
                 partial_model = vptree.Vptree([point.Point(coordinates=features[i].tolist(),
                                                            src=Path.__fspath__(img_paths[i])) for i in filtered_set])
                 utils.t4 = time.time()
@@ -106,9 +108,12 @@ def index():
                                if index_time != "0" else
                                "Index is already built.",
                                default_mode=utils.mode,
-                               no_results=0)
+                               default_database_size=utils.database_size,
+                               default_num_results=utils.k_results,
+                               no_results=str(len(http_result)))
     else:
-        return render_template('index.html', no_results=0)
+        return render_template('index.html', no_results="", default_mode="no filtering",
+                               default_database_size=100, default_num_results=10)
 
 
 if __name__ == "__main__":

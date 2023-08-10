@@ -17,13 +17,15 @@ query_size = None
 
 lines = None
 
-t1 = t2 = t3 = t4 = 0
+database_size = None
 
-# number of results wanted
-k_results = 10
+k_results = None
+
+t1 = t2 = t3 = t4 = 0
 
 # options: "no filtering", "pre-query filtering", "post-query filtering", "concurrent filtering"
 mode = None
+
 
 def is_valid(img_path):
     if mode != "no filtering":
