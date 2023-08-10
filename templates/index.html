@@ -20,8 +20,15 @@
                             <input type="text" class="form-control" id="query_text" name="query_text" disabled>
                         </div>
                         <div class="form-group">
-                            <label for="query_size">Specify size (e.g. 500*375):</label>
-                            <input type="text" class="form-control" id="query_size" name="query_size" disabled>
+                            <label for="query_size">Specify size:</label>
+                            <select class="form-control" id="query_size" name="query_size" disabled>
+                                <option id="Any" value="any"></option>
+                                <option id="500*375" value="500*375">500*375</option>
+                                <option id="375*500" value="375*500">375*500</option>
+                                <option id="500*333" value="500*333">500*333</option>
+                                <option id="333*500" value="333*500">333*500</option>
+                                <option id="Other" value="other">Other</option>
+                            </select>
                         </div>
                          <div class="form-group">
                             <label for="search_type">Search by:</label>
@@ -111,37 +118,39 @@
             label2.style.color = "blue";
 
             var default_mode = "{{ default_mode }}";
-            var default_option = document.getElementById(default_mode);
-            default_option.selected = true;
+            var mode_default_option = document.getElementById(default_mode);
+            mode_default_option.selected = true;
             var default_database_size = document.getElementById("d"+"{{ default_database_size }}");
             default_database_size.selected = true;
             var default_num_results = document.getElementById("n"+"{{ default_num_results }}");
             default_num_results.selected = true;
 
-            var select = document.getElementById("search_type");
-            var input1 = document.getElementById("query_text");
-            var input2 = document.getElementById("query_size");
-            input1.value = "{{ default_text }}"
-            input2.value = "{{ default_size }}"
-            select.addEventListener("change", updateInputState);
+            var search_type_select = document.getElementById("search_type");
+            var text_input = document.getElementById("query_text");
+            var size_select = document.getElementById("query_size");
+            text_input.value = "{{ default_text }}"
+
+            var default_size = "{{ default_size }}"
+            var size_default_option = document.getElementById(default_size);
+            size_default_option.selected = true;
+            search_type_select.addEventListener("change", updateInputState);
 
             function updateInputState() {
-                console.log("changed");
-                if (select.value != "no filtering") {
-                    input1.disabled = false;
-                    input2.disabled = false;
+                if (search_type_select.value != "no filtering") {
+                    text_input.disabled = false;
+                    size_select.disabled = false;
                 } else {
-                    input1.disabled = true;
-                    input2.disabled = true;
+                    text_input.disabled = true;
+                    size_select.disabled = true;
                 }
             }
 
-            if (default_option.value === "no filtering"){
-                input1.disabled = true;
-                input2.disabled = true;
+            if (mode_default_option.value === "no filtering"){
+                text_input.disabled = true;
+                size_select.disabled = true;
             } else {
-                input1.disabled = false;
-                input2.disabled = false;
+                text_input.disabled = false;
+                size_select.disabled = false;
             }
 
         </script>

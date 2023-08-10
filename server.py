@@ -39,12 +39,12 @@ def index():
             utils.query_text = ""
         utils.query_size = request.form.get('query_size')
         if utils.query_size is None:
-            utils.query_size = ""
+            utils.query_size = "Any"
         utils.mode = request.form.get('search_type')
         utils.database_size = int(request.form.get("database_size"))
         utils.k_results = int(request.form.get("num_results"))
 
-        if not utils.query_text and not utils.query_size:
+        if not utils.query_text and utils.query_size == "Any":
             utils.mode = "no filtering"
         # Save query image
         img = Image.open(utils.query_img.stream)  # PIL image
@@ -128,7 +128,7 @@ def index():
         return render_template('index.html', num_results="",
                                default_mode="no filtering",
                                default_text="",
-                               default_size="",
+                               default_size="Any",
                                default_database_size=100,
                                default_num_results=10)
 

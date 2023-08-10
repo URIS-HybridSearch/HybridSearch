@@ -32,11 +32,13 @@ def is_valid(img_path):
         cap = lines[Path.__fspath__(img_path).replace("static\\img\\", "")]
         if not (query_text in cap):
             return False
-        if query_size != "":
-            with Image.open(img_path) as img:
-                width, height = img.size
-                if str(width) + "*" + str(height) != query_size:
-                    return False
-        return True
+        if query_size == "Any":
+            return True
+        with Image.open(img_path) as img:
+            width, height = img.size
+            if query_size == "Other":
+                return str(width) + "*" + str(height) not in ["333*500", "500*333", "500*375", "375*500"]
+            else:
+                return str(width) + "*" + str(height) == query_size
     else:
         return True
