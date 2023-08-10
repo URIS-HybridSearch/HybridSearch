@@ -33,6 +33,24 @@
                             </select>
                         </div>
                         <div class="form-group">
+                            <label for="database_size">Database size:</label>
+                            <select class="form-control" id="database_size" name="database_size">
+                                <option id="d100" value="100">100 images</option>
+                                <option id="d500" value="500">500 images</option>
+                                <option id="d2000" value="2000">2000 images</option>
+                                <option id="d8091" value="8091">8091 images</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="num_results">Number of results wanted:</label>
+                            <select class="form-control" id="num_results" name="num_results">
+                                <option id="n10" value="10">10 images</option>
+                                <option id="n20" value="20">20 images</option>
+                                <option id="n50" value="50">50 images</option>
+                                <option id="n100" value="100">100 images</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
                             <label id="search_time"></label>
                         </div>
                         <div class="form-group">
@@ -53,7 +71,7 @@
             </div>
             <div class="row">
                 <div class="col-md-12">
-                    <h2>Results:</h2>
+                    <h2 id="results">Results:</h2>
                 </div>
                 {% for score in scores %}
                 <div class="col-md-4">
@@ -66,9 +84,14 @@
             </div>
         </div>
         <script>
-            var no_results = "{{ no_results }}";
-            if(no_results == 1){
-                alert("No results found.");
+            var num_results = "{{ num_results }}";
+            var results_label = document.getElementById("results");
+            if(num_results == "0"){
+                results_label.textContent = "No results found.";
+            }else if(num_results == ""){
+                results_label.textContent = "";
+            }else{
+                results_label.textContent = no_results + " results found.";
             }
             var img_input = document.getElementById("query_img");
             img_input.addEventListener("change", enable_search);
@@ -88,11 +111,12 @@
             label2.style.color = "blue";
 
             var default_mode = "{{ default_mode }}";
-            if (default_mode == ""){
-                default_mode = "no filtering"
-            }
             var default_option = document.getElementById(default_mode);
             default_option.selected = true;
+            var default_database_size = document.getElementById("d"+"{{ default_database_size }}");
+            default_database_size.selected = true;
+            var default_num_results = document.getElementById("n"+"{{ default_num_results }}");
+            default_num_results.selected = true;
 
             var select = document.getElementById("search_type");
             var input1 = document.getElementById("query_text");

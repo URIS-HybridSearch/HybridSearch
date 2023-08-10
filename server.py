@@ -88,7 +88,7 @@ def index():
                         filtered_set.append(i)
                 if len(filtered_set) == 0:
                     return render_template('index.html',
-                                           n_results="0",
+                                           num_results="0",
                                            default_mode=utils.mode,
                                            default_database_size=utils.database_size,
                                            default_num_results=utils.k_results,)
@@ -114,9 +114,9 @@ def index():
                                default_mode=utils.mode,
                                default_database_size=utils.database_size,
                                default_num_results=utils.k_results,
-                               no_results=str(len(http_result)))
+                               num_results=str(len(http_result)))
     else:
-        return render_template('index.html', no_results="", default_mode="no filtering",
+        return render_template('index.html', num_results="", default_mode="no filtering",
                                default_database_size=100, default_num_results=10)
 
 
