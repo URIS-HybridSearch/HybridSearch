@@ -1,10 +1,9 @@
-from typing import List
 import math
 import utils
 
 
 class Point:
-    def __init__(self, coordinates: List[float], src: str):
+    def __init__(self, coordinates, src):
         self.coordinates = coordinates
         self.path = src
 
