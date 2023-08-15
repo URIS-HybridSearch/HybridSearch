@@ -9,6 +9,8 @@ knn_threshold = None
 
 query_point = None
 
+query_anns = None
+
 query_img = None
 
 query_text = None
