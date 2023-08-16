@@ -15,7 +15,7 @@ app = Flask(__name__)
 
 # Read image features
 fe = FeatureExtractor()
-pq = ProductQuantizer(num_clusters=256)
+pq = ProductQuantizer(num_clusters=16)
 features = []
 img_paths = []
 for feature_path in Path("./static/feature").glob("*.npy"):
@@ -43,7 +43,7 @@ def index():
         if utils.query_size is None:
             utils.query_size = "any"
         utils.query_anns = request.form.get('anns_method')
-        if utils.anns is None:
+        if utils.query_anns is None:
             utils.query_size = "VP-Tree"
         utils.mode = request.form.get('search_type')
         utils.database_size = int(request.form.get("database_size"))
@@ -60,9 +60,11 @@ def index():
         # PQ
         if utils.query_anns == "product quantization":
 
-            directory_path = Path("./static/code")
-            directory_path.mkdir(parents=True, exist_ok=True)
-            code_path = Path("./static/code") / ("codeword" + ".npy")  # e.g., ./static/feature/xxx.npy
+            pq_path = Path("./static/code")
+            pq_path.mkdir(parents=True, exist_ok=True)
+            code_path = Path("./static/code") / ("codeword_16" + ".npy")  # e.g., ./static/feature/xxx.npy
+            dict_path = Path("./static/code") / ("dict_16" + ".npy")
+
             query = fe.extract(img)
 
             if not code_path.exists():
@@ -82,78 +84,86 @@ def index():
 
                 print("size: ", np.array(features_list).shape)
 
-                codeword = pq.train(np.array(features_list), 16)
+                codeword = pq.train(np.array(features_list), 256)
                 np.save(code_path, codeword)
             else:
                 codeword = np.load(code_path)
 
             utils.t1 = time.time()
-            print(codeword.shape)
+            print("The shape of codeword: ", codeword.shape)
 
-            criteria = utils.query_text + "_" + utils.query_size + "_" + str(utils.database_size)
+            min_score = 3
+            min_score_paths = []
 
+            file_code_dict = {}
 
-            # In PQ, the indexing time can be counted as encoding time.
-            if utils.mode == "pre-query filtering":
-                utils.t3 = time.time()
-                filtered_set = []
-                for i in range(utils.database_size):
-                    if utils.is_valid(img_paths[i]):
-                        filtered_set.append(i)
-
-                min_score = 3
-                min_score_paths = []
-
+            if not dict_path.exists():
+                # file_code_dict = {}
                 for feature_path in Path("./static/feature").glob("*.npy"):
                     vec = []
                     vec.append(np.load(feature_path))
                     pqcode = pq.encode(codeword, np.array(vec))
-                    # print(feature_path, pqcode)
-                    dist = pq.search(codeword, pqcode, query)
+                    filename_without_suffix = feature_path.stem
+                    # print(filename_without_suffix)
+                    file_code_dict[filename_without_suffix] = pqcode
+                    np.save(dict_path, file_code_dict)
+                    # print(file_code_dict)
+            else:
+                file_code_dict = np.load(dict_path, allow_pickle=True).item()
 
-                    if dist <= min_score:
-                        print(feature_path, pqcode, dist)
-                        real_dist = np.linalg.norm(query - vec)  # Calculate the real distance
-                        if dist < min_score:
-                            min_score = dist
-                            min_score_paths = [(feature_path, real_dist)]
-                        else:
-                            min_score_paths.append((feature_path, real_dist))
+            for filename, pqcode in file_code_dict.items():
+                dist = pq.search(codeword, pqcode, query)
+                if dist <= min_score:
+                    print(filename, pqcode, dist)
+                    vec = np.load(Path("./static/feature") / (filename + ".npy"))
+                    real_dist = np.linalg.norm(query - vec)  # Calculate the real distance
+                    if dist < min_score:
+                        min_score = dist
+                        min_score_paths = [(filename, real_dist)]
+                    else:
+                        min_score_paths.append((filename, real_dist))
 
-                # Rank the paths in ascending order based on real distance
-                min_score_paths.sort(key=lambda x: x[1])
-                utils.t2 = time.time()
-            # TODO: to finish the search mode.
+            # Rank the paths in ascending order based on real distance
+            min_score_paths.sort(key=lambda x: x[1])
+
+            http_result = []
+
+            for filename, real_dist in min_score_paths:
+                converted_path = "static/img/" + filename + ".jpg"
+                converted_filename = filename + ".jpg"
+
+                http_result.append((utils.lines[converted_filename], converted_path))
+
+            utils.t2 = time.time()
+
+            # can be integrated with redis
+            # criteria = utils.query_text + "_" + utils.query_size + "_" + str(utils.database_size)
+
+            # In PQ, the indexing time can be counted as encoding time.
+            # utils.t3 = time.time()
+            # filtered_set = []
+            # for i in range(utils.database_size):
+            #     if utils.is_valid(img_paths[i]):
+            #         filtered_set.append(i)
             #
+            # print(filtered_set)
             #
-            #
-            #
-            # elif utils.mode == "post-query filtering":
-            #
-            # elif utils.mode == "concurrent filtering":
-            #
-            # else:
-            #
-            #
-            #
-            #
-            #
-            #
-            #
-            #
-            #
-            #
-            #
-            # return render_template('index.html',
-            #                        query_path=uploaded_img_path,
-            #                        scores=http_result,
-            #                        search_time="Query time: " + str(round(1000 * (utils.t2 - utils.t1))) + "ms",
-            #                        default_text=utils.query_text,
-            #                        default_size=utils.query_size,
-            #                        default_mode=utils.mode,
-            #                        default_database_size=utils.database_size,
-            #                        default_num_results=utils.k_results,
-            #                        num_results=str(len(http_result)))
+            # utils.t2 = time.time()
+            # result = []
+            # http_result = [(utils.lines[x.path.replace("static\\img\\", "")], x.path)
+            #                for x in sorted(list(result.queue), reverse=True)]
+
+            return render_template('index.html',
+                                   query_path=uploaded_img_path,
+                                   scores=http_result,
+                                   search_time="Query time: " + str(round(1000 * (utils.t2 - utils.t1))) + "ms",
+                                   default_text=utils.query_text,
+                                   default_size=utils.query_size,
+                                   default_mode=utils.mode,
+                                   default_database_size=utils.database_size,
+                                   default_num_results=utils.k_results,
+                                   num_results=str(len(http_result)))
+
 
         # vp-tree
         else:
@@ -212,9 +222,10 @@ def index():
                 utils.t1 = time.time()
                 result = indices[criteria].knn_search(query, utils.k_results)
                 utils.t2 = time.time()
-
+            print(result.queue)
             http_result = [(utils.lines[x.path.replace("static\\img\\", "")], x.path)
                            for x in sorted(list(result.queue), reverse=True)]
+            print(http_result)
             index_time = str(round(1000 * (utils.t4 - utils.t3)))
             return render_template('index.html',
                                    query_path=uploaded_img_path,

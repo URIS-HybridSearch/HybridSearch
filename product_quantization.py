@@ -1,5 +1,5 @@
 import time
-
+# import json
 from sklearn.cluster import MiniBatchKMeans
 import numpy as np
 from scipy.cluster.vq import vq, kmeans2
@@ -51,16 +51,17 @@ class ProductQuantizer:
 
 if __name__ == '__main__':
 
-    directory_path = Path("./static/code")
-    directory_path.mkdir(parents=True, exist_ok=True)
-    code_path = Path("./static/code") / ("codeword" + ".npy")  # e.g., ./static/feature/xxx.npy
+    pq_path = Path("./static/code")
+    pq_path.mkdir(parents=True, exist_ok=True)
+    code_path = Path("./static/code") / ("codeword_256" + ".npy")  # e.g., ./static/feature/xxx.npy
+    dict_path = Path("./static/code") / ("dict_256" + ".npy")
 
     codeword = 0
     fe = FeatureExtractor()
     pq = ProductQuantizer(num_clusters=256)
+
     if not code_path.exists():
         # num_vectors = 600  # Number of vectors to concatenate
-
         features = []  # List to store extracted features
 
         for feature_path in Path("./static/pq_feature_train").glob("*.npy"):
@@ -73,10 +74,10 @@ if __name__ == '__main__':
             # print(img_path)  # e.g., ./static/img/xxx.jpg
             features.append(np.load(feature_path))  # Append feature to the list
             print(len(features))
+
         print("end")
         print("size: ", np.array(features).shape)
-
-        codeword = pq.train(np.array(features), 16)
+        codeword = pq.train(np.array(features), 256)
         np.save(code_path, codeword)
 
     else:
@@ -88,21 +89,35 @@ if __name__ == '__main__':
     min_score = 2
     min_score_paths = []
 
-    for feature_path in Path("./static/feature").glob("*.npy"):
-        vec = []
-        vec.append(np.load(feature_path))
-        pqcode = pq.encode(codeword, np.array(vec))
-        # print(feature_path, pqcode)
-        dist = pq.search(codeword, pqcode, test_img_vec)
+    file_code_dict = {}
 
+    if not dict_path.exists():
+        # file_code_dict = {}
+        for feature_path in Path("./static/feature").glob("*.npy"):
+            vec = []
+            vec.append(np.load(feature_path))
+            pqcode = pq.encode(codeword, np.array(vec))
+            filename_without_suffix = feature_path.stem
+            # print(filename_without_suffix)
+            file_code_dict[filename_without_suffix] = pqcode
+            np.save(dict_path, file_code_dict)
+            # print(file_code_dict)
+    else:
+        file_code_dict = np.load(dict_path, allow_pickle=True).item()
+
+    for filename, pqcode in file_code_dict.items():
+        dist = pq.search(codeword, pqcode, test_img_vec)
         if dist <= min_score:
-            print(feature_path, pqcode, dist)
+            print(filename, pqcode, dist)
+            vec = np.load(Path("./static/feature") / (filename + ".npy"))
             real_dist = np.linalg.norm(test_img_vec - vec)  # Calculate the real distance
             if dist < min_score:
                 min_score = dist
-                min_score_paths = [(feature_path, real_dist)]
+                min_score_paths = [(filename, real_dist)]
             else:
-                min_score_paths.append((feature_path, real_dist))
+                min_score_paths.append((filename, real_dist))
+
+
     # Rank the paths in ascending order based on real distance
     min_score_paths.sort(key=lambda x: x[1])
 
