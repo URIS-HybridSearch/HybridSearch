@@ -105,6 +105,7 @@ if __name__ == '__main__':
     else:
         file_code_dict = np.load(dict_path, allow_pickle=True).item()
 
+
     for filename, pqcode in file_code_dict.items():
         dist = pq.search(codeword, pqcode, test_img_vec)
         if dist <= min_score:

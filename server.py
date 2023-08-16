@@ -7,6 +7,7 @@ from flask import Flask, request, render_template
 import random
 import point
 import utils
+import heapq
 from product_quantization import ProductQuantizer
 import vptree
 from feature_extractor import FeatureExtractor
@@ -84,7 +85,7 @@ def index():
 
                 print("size: ", np.array(features_list).shape)
 
-                codeword = pq.train(np.array(features_list), 256)
+                codeword = pq.train(np.array(features_list), 16)
                 np.save(code_path, codeword)
             else:
                 codeword = np.load(code_path)
@@ -92,7 +93,6 @@ def index():
             utils.t1 = time.time()
             print("The shape of codeword: ", codeword.shape)
 
-            min_score = 3
             min_score_paths = []
 
             file_code_dict = {}
@@ -111,47 +111,46 @@ def index():
             else:
                 file_code_dict = np.load(dict_path, allow_pickle=True).item()
 
+            pqdistance_filename_dict = {}
+            counter = 0
             for filename, pqcode in file_code_dict.items():
                 dist = pq.search(codeword, pqcode, query)
-                if dist <= min_score:
-                    print(filename, pqcode, dist)
-                    vec = np.load(Path("./static/feature") / (filename + ".npy"))
-                    real_dist = np.linalg.norm(query - vec)  # Calculate the real distance
-                    if dist < min_score:
-                        min_score = dist
-                        min_score_paths = [(filename, real_dist)]
-                    else:
-                        min_score_paths.append((filename, real_dist))
+                dist = dist[0]
+                if dist in pqdistance_filename_dict:
+                    pqdistance_filename_dict[dist].append(filename)
+                else:
+                    pqdistance_filename_dict[dist] = [filename]
+                if counter == utils.database_size:
+                    break
+
+            # Get the minimum distances using heapq
+            smallest_distances = heapq.nsmallest(5, pqdistance_filename_dict.keys())
+            # print(smallest_distances)
+            # Retrieve filenames corresponding to the smallest distances
+            filenames = [filename for distance, filenames in pqdistance_filename_dict.items() if
+                         distance in smallest_distances for filename in filenames]
+
+            # Print the filenames
+            # print(filenames)
+            for filename in filenames:
+                vec = np.load(Path("./static/feature") / (filename + ".npy"))
+                real_dist = np.linalg.norm(query - vec)  # Calculate the real distance
+
+                if utils.is_valid(Path("./static/img") / (filename + ".jpg")):
+                    min_score_paths.append((filename, real_dist))
 
             # Rank the paths in ascending order based on real distance
             min_score_paths.sort(key=lambda x: x[1])
+            min_score_paths = min_score_paths[:utils.k_results]
 
             http_result = []
 
             for filename, real_dist in min_score_paths:
                 converted_path = "static/img/" + filename + ".jpg"
                 converted_filename = filename + ".jpg"
-
                 http_result.append((utils.lines[converted_filename], converted_path))
 
             utils.t2 = time.time()
-
-            # can be integrated with redis
-            # criteria = utils.query_text + "_" + utils.query_size + "_" + str(utils.database_size)
-
-            # In PQ, the indexing time can be counted as encoding time.
-            # utils.t3 = time.time()
-            # filtered_set = []
-            # for i in range(utils.database_size):
-            #     if utils.is_valid(img_paths[i]):
-            #         filtered_set.append(i)
-            #
-            # print(filtered_set)
-            #
-            # utils.t2 = time.time()
-            # result = []
-            # http_result = [(utils.lines[x.path.replace("static\\img\\", "")], x.path)
-            #                for x in sorted(list(result.queue), reverse=True)]
 
             return render_template('index.html',
                                    query_path=uploaded_img_path,
