@@ -24,7 +24,7 @@ class ProductQuantizer:
             # print(vec[m])
             print("Num ", m, " starts with vec", vec[m*Ds:(m+1)*Ds].shape, " from ", m*Ds, " to ", (m+1)*Ds)
             vec_sub = vec[:, m*Ds:(m+1)*Ds].reshape(-1, 1)
-            codeword[m], label = kmeans2(vec_sub, 256, minit='random')
+            codeword[m], label = kmeans2(vec_sub, self.num_clusters, minit='random')
             print("Cluster No. ", m)
         return codeword
 
@@ -40,7 +40,7 @@ class ProductQuantizer:
 
     def search(self, codeword, pqcode, query):
         M, _K, Ds = codeword.shape
-        dist_table = np.empty((M, 256), np.float32)
+        dist_table = np.empty((M, self.num_clusters), np.float32)
 
         for m in range(M):
             query_sub = query[m*Ds:(m+1)*Ds]
@@ -53,8 +53,8 @@ if __name__ == '__main__':
 
     pq_path = Path("./static/code")
     pq_path.mkdir(parents=True, exist_ok=True)
-    code_path = Path("./static/code") / ("codeword_256" + ".npy")  # e.g., ./static/feature/xxx.npy
-    dict_path = Path("./static/code") / ("dict_256" + ".npy")
+    code_path = Path("./static/code") / ("codeword_16" + ".npy")  # e.g., ./static/feature/xxx.npy
+    dict_path = Path("./static/code") / ("dict_16" + ".npy")
 
     codeword = 0
     fe = FeatureExtractor()
@@ -77,7 +77,7 @@ if __name__ == '__main__':
 
         print("end")
         print("size: ", np.array(features).shape)
-        codeword = pq.train(np.array(features), 256)
+        codeword = pq.train(np.array(features), 16)
         np.save(code_path, codeword)
 
     else:

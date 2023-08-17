@@ -1,6 +1,7 @@
 from datetime import datetime
 from pathlib import Path
 import time
+from datetime import datetime
 import numpy as np
 from PIL import Image
 from flask import Flask, request, render_template
@@ -16,7 +17,8 @@ app = Flask(__name__)
 
 # Read image features
 fe = FeatureExtractor()
-pq = ProductQuantizer(num_clusters=16)
+pq = ProductQuantizer(num_clusters=256)
+
 features = []
 img_paths = []
 for feature_path in Path("./static/feature").glob("*.npy"):
@@ -44,6 +46,16 @@ def index():
         if utils.query_size is None:
             utils.query_size = "any"
         utils.query_anns = request.form.get('anns_method')
+        # Split the string based on spaces
+        split_string = utils.query_anns.split()
+        # Extract the string part
+        string_part = " ".join(split_string[:-1])
+        pq_k = 16
+        if string_part == "product quantization":
+            utils.query_anns = string_part
+            # Extract the integer part
+            pq_k = int(split_string[-1])
+
         if utils.query_anns is None:
             utils.query_size = "VP-Tree"
         utils.mode = request.form.get('search_type')
@@ -63,15 +75,15 @@ def index():
 
             pq_path = Path("./static/code")
             pq_path.mkdir(parents=True, exist_ok=True)
-            code_path = Path("./static/code") / ("codeword_16" + ".npy")  # e.g., ./static/feature/xxx.npy
-            dict_path = Path("./static/code") / ("dict_16" + ".npy")
+            code_path = Path("./static/code") / ("codeword_" + str(pq_k) + ".npy")  # e.g., ./static/feature/xxx.npy
+            dict_path = Path("./static/code") / ("dict_" + str(pq_k) + ".npy")
 
             query = fe.extract(img)
 
             if not code_path.exists():
+                # codebook construction
                 # Number of vectors to concatenate
                 features_list = []  # List to store extracted features
-
                 # the codeword is trained already and provided, so this training can be ignored.
                 for feature_path in Path("./static/pq_feature_train").glob("*.npy"):
                     # print(img_path)  # e.g., ./static/img/xxx.jpg
@@ -85,7 +97,7 @@ def index():
 
                 print("size: ", np.array(features_list).shape)
 
-                codeword = pq.train(np.array(features_list), 16)
+                codeword = pq.train(np.array(features_list), pq_k)
                 np.save(code_path, codeword)
             else:
                 codeword = np.load(code_path)
@@ -111,6 +123,7 @@ def index():
             else:
                 file_code_dict = np.load(dict_path, allow_pickle=True).item()
 
+            print("1. Current time is:", datetime.now())
             pqdistance_filename_dict = {}
             counter = 0
             for filename, pqcode in file_code_dict.items():
@@ -120,16 +133,17 @@ def index():
                     pqdistance_filename_dict[dist].append(filename)
                 else:
                     pqdistance_filename_dict[dist] = [filename]
+                counter += 1
                 if counter == utils.database_size:
                     break
-
+            print("2. Current time is:", datetime.now())
             # Get the minimum distances using heapq
             smallest_distances = heapq.nsmallest(5, pqdistance_filename_dict.keys())
             # print(smallest_distances)
             # Retrieve filenames corresponding to the smallest distances
             filenames = [filename for distance, filenames in pqdistance_filename_dict.items() if
                          distance in smallest_distances for filename in filenames]
-
+            print("3. Current time is:", datetime.now())
             # Print the filenames
             # print(filenames)
             for filename in filenames:
@@ -162,7 +176,6 @@ def index():
                                    default_database_size=utils.database_size,
                                    default_num_results=utils.k_results,
                                    num_results=str(len(http_result)))
-
 
         # vp-tree
         else:
