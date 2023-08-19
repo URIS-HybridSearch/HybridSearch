@@ -35,6 +35,221 @@ with open('captions.txt', 'r') as f:
 indices = {}
 
 
+def pq_pre_query(pq_k, img, uploaded_img_path):
+    pq_path = Path("./static/code")
+    pq_path.mkdir(parents=True, exist_ok=True)
+    code_path = Path("./static/code") / ("codeword_" + str(pq_k) + ".npy")  # e.g., ./static/feature/xxx.npy
+    dict_path = Path("./static/code") / ("dict_" + str(pq_k) + ".npy")
+
+    query = fe.extract(img)
+    valid_candidate = []
+
+    for feature_path in Path("./static/feature").glob("*.npy"):
+        filename_without_suffix = feature_path.stem
+        if utils.is_valid(Path("./static/img") / (filename_without_suffix + ".jpg")):
+            valid_candidate.append(filename_without_suffix)
+
+
+    if not code_path.exists():
+        # codebook construction
+        # Number of vectors to concatenate
+        features_list = []  # List to store extracted features
+        # the codeword is trained already and provided, so this training can be ignored.
+        for feature_path in Path("./static/pq_feature_train").glob("*.npy"):
+            # print(img_path)  # e.g., ./static/img/xxx.jpg
+            features_list.append(np.load(feature_path))  # Append feature to the list
+            print(len(features_list))
+
+        for feature_path in Path("./static/pq_feature_train2").glob("*.npy"):
+            # print(img_path)  # e.g., ./static/img/xxx.jpg
+            features_list.append(np.load(feature_path))  # Append feature to the list
+            print(len(features_list))
+
+        print("Size: ", np.array(features_list).shape)
+
+        codeword = pq.train(np.array(features_list), pq_k)
+        np.save(code_path, codeword)
+    else:
+        codeword = np.load(code_path)
+
+    utils.t1 = time.time()
+    print("The shape of codeword: ", codeword.shape)
+
+    min_score_paths = []
+    file_code_dict = {}
+
+    if not dict_path.exists():
+        # file_code_dict = {}
+        for feature_path in Path("./static/feature").glob("*.npy"):
+            vec = []
+            vec.append(np.load(feature_path))
+            pqcode = pq.encode(codeword, np.array(vec))
+            filename_without_suffix = feature_path.stem
+            # print(filename_without_suffix)
+            file_code_dict[filename_without_suffix] = pqcode
+            np.save(dict_path, file_code_dict)
+            # print(file_code_dict)
+    else:
+        file_code_dict = np.load(dict_path, allow_pickle=True).item()
+
+    print("1. Current time is:", datetime.now())
+    pqdistance_filename_dict = {}
+    counter = 0
+    for filename, pqcode in file_code_dict.items():
+        if filename in valid_candidate:
+            dist = pq.search(codeword, pqcode, query)
+            dist = dist[0]
+            if dist in pqdistance_filename_dict:
+                pqdistance_filename_dict[dist].append(filename)
+            else:
+                pqdistance_filename_dict[dist] = [filename]
+        counter += 1
+        if counter == utils.database_size:
+            break
+    print("2. Current time is:", datetime.now())
+    # Get the minimum distances using heapq
+    smallest_distances = heapq.nsmallest(5, pqdistance_filename_dict.keys())
+    # print(smallest_distances)
+    # Retrieve filenames corresponding to the smallest distances
+    filenames = [filename for distance, filenames in pqdistance_filename_dict.items() if
+                 distance in smallest_distances for filename in filenames]
+    print("3. Current time is:", datetime.now())
+    # Print the filenames
+    # print(filenames)
+    for filename in filenames:
+        vec = np.load(Path("./static/feature") / (filename + ".npy"))
+        real_dist = np.linalg.norm(query - vec)  # Calculate the real distance
+        min_score_paths.append((filename, real_dist))
+
+    # Rank the paths in ascending order based on real distance
+    min_score_paths.sort(key=lambda x: x[1])
+    min_score_paths = min_score_paths[:utils.k_results]
+
+    http_result = []
+
+    for filename, real_dist in min_score_paths:
+        converted_path = "static/img/" + filename + ".jpg"
+        converted_filename = filename + ".jpg"
+        http_result.append((utils.lines[converted_filename], converted_path))
+
+    utils.t2 = time.time()
+
+    return render_template('index.html',
+                           query_path=uploaded_img_path,
+                           scores=http_result,
+                           search_time="Query time: " + str(round(1000 * (utils.t2 - utils.t1))) + "ms",
+                           default_text=utils.query_text,
+                           default_size=utils.query_size,
+                           default_mode=utils.mode,
+                           default_database_size=utils.database_size,
+                           default_num_results=utils.k_results,
+                           num_results=str(len(http_result)))
+
+def pq_post_query(pq_k, img, uploaded_img_path):
+
+    pq_path = Path("./static/code")
+    pq_path.mkdir(parents=True, exist_ok=True)
+    code_path = Path("./static/code") / ("codeword_" + str(pq_k) + ".npy")  # e.g., ./static/feature/xxx.npy
+    dict_path = Path("./static/code") / ("dict_" + str(pq_k) + ".npy")
+    query = fe.extract(img)
+
+    if not code_path.exists():
+        # codebook construction
+        # Number of vectors to concatenate
+        features_list = []  # List to store extracted features
+        # the codeword is trained already and provided, so this training can be ignored.
+        for feature_path in Path("./static/pq_feature_train").glob("*.npy"):
+            # print(img_path)  # e.g., ./static/img/xxx.jpg
+            features_list.append(np.load(feature_path))  # Append feature to the list
+            print(len(features_list))
+
+        for feature_path in Path("./static/pq_feature_train2").glob("*.npy"):
+            # print(img_path)  # e.g., ./static/img/xxx.jpg
+            features_list.append(np.load(feature_path))  # Append feature to the list
+            print(len(features_list))
+
+        print("size: ", np.array(features_list).shape)
+
+        codeword = pq.train(np.array(features_list), pq_k)
+        np.save(code_path, codeword)
+    else:
+        codeword = np.load(code_path)
+
+    utils.t1 = time.time()
+    print("The shape of codeword: ", codeword.shape)
+
+    min_score_paths = []
+    file_code_dict = {}
+
+    if not dict_path.exists():
+        # file_code_dict = {}
+        for feature_path in Path("./static/feature").glob("*.npy"):
+            vec = []
+            vec.append(np.load(feature_path))
+            pqcode = pq.encode(codeword, np.array(vec))
+            filename_without_suffix = feature_path.stem
+            # print(filename_without_suffix)
+            file_code_dict[filename_without_suffix] = pqcode
+            np.save(dict_path, file_code_dict)
+            # print(file_code_dict)
+    else:
+        file_code_dict = np.load(dict_path, allow_pickle=True).item()
+
+    print("1. Current time is:", datetime.now())
+    pqdistance_filename_dict = {}
+    counter = 0
+    for filename, pqcode in file_code_dict.items():
+        dist = pq.search(codeword, pqcode, query)
+        dist = dist[0]
+        if dist in pqdistance_filename_dict:
+            pqdistance_filename_dict[dist].append(filename)
+        else:
+            pqdistance_filename_dict[dist] = [filename]
+        counter += 1
+        if counter == utils.database_size:
+            break
+    print("2. Current time is:", datetime.now())
+    # Get the minimum distances using heapq
+    smallest_distances = heapq.nsmallest(5, pqdistance_filename_dict.keys())
+    # print(smallest_distances)
+    # Retrieve filenames corresponding to the smallest distances
+    filenames = [filename for distance, filenames in pqdistance_filename_dict.items() if
+                 distance in smallest_distances for filename in filenames]
+    print("3. Current time is:", datetime.now())
+    # Print the filenames
+    # print(filenames)
+    for filename in filenames:
+        vec = np.load(Path("./static/feature") / (filename + ".npy"))
+        real_dist = np.linalg.norm(query - vec)  # Calculate the real distance
+
+        if utils.is_valid(Path("./static/img") / (filename + ".jpg")):
+            min_score_paths.append((filename, real_dist))
+
+    # Rank the paths in ascending order based on real distance
+    min_score_paths.sort(key=lambda x: x[1])
+    min_score_paths = min_score_paths[:utils.k_results]
+
+    http_result = []
+
+    for filename, real_dist in min_score_paths:
+        converted_path = "static/img/" + filename + ".jpg"
+        converted_filename = filename + ".jpg"
+        http_result.append((utils.lines[converted_filename], converted_path))
+
+    utils.t2 = time.time()
+
+    return render_template('index.html',
+                           query_path=uploaded_img_path,
+                           scores=http_result,
+                           search_time="Query time: " + str(round(1000 * (utils.t2 - utils.t1))) + "ms",
+                           default_text=utils.query_text,
+                           default_size=utils.query_size,
+                           default_mode=utils.mode,
+                           default_database_size=utils.database_size,
+                           default_num_results=utils.k_results,
+                           num_results=str(len(http_result)))
+
+
 @app.route('/', methods=['GET', 'POST'])
 def index():
     if request.method == 'POST':
@@ -73,109 +288,11 @@ def index():
         # PQ
         if utils.query_anns == "product quantization":
 
-            pq_path = Path("./static/code")
-            pq_path.mkdir(parents=True, exist_ok=True)
-            code_path = Path("./static/code") / ("codeword_" + str(pq_k) + ".npy")  # e.g., ./static/feature/xxx.npy
-            dict_path = Path("./static/code") / ("dict_" + str(pq_k) + ".npy")
+            if utils.mode == "post-query filtering":
+                return pq_post_query(pq_k, img, uploaded_img_path)
 
-            query = fe.extract(img)
-
-            if not code_path.exists():
-                # codebook construction
-                # Number of vectors to concatenate
-                features_list = []  # List to store extracted features
-                # the codeword is trained already and provided, so this training can be ignored.
-                for feature_path in Path("./static/pq_feature_train").glob("*.npy"):
-                    # print(img_path)  # e.g., ./static/img/xxx.jpg
-                    features_list.append(np.load(feature_path))  # Append feature to the list
-                    print(len(features_list))
-
-                for feature_path in Path("./static/pq_feature_train2").glob("*.npy"):
-                    # print(img_path)  # e.g., ./static/img/xxx.jpg
-                    features_list.append(np.load(feature_path))  # Append feature to the list
-                    print(len(features_list))
-
-                print("size: ", np.array(features_list).shape)
-
-                codeword = pq.train(np.array(features_list), pq_k)
-                np.save(code_path, codeword)
             else:
-                codeword = np.load(code_path)
-
-            utils.t1 = time.time()
-            print("The shape of codeword: ", codeword.shape)
-
-            min_score_paths = []
-
-            file_code_dict = {}
-
-            if not dict_path.exists():
-                # file_code_dict = {}
-                for feature_path in Path("./static/feature").glob("*.npy"):
-                    vec = []
-                    vec.append(np.load(feature_path))
-                    pqcode = pq.encode(codeword, np.array(vec))
-                    filename_without_suffix = feature_path.stem
-                    # print(filename_without_suffix)
-                    file_code_dict[filename_without_suffix] = pqcode
-                    np.save(dict_path, file_code_dict)
-                    # print(file_code_dict)
-            else:
-                file_code_dict = np.load(dict_path, allow_pickle=True).item()
-
-            print("1. Current time is:", datetime.now())
-            pqdistance_filename_dict = {}
-            counter = 0
-            for filename, pqcode in file_code_dict.items():
-                dist = pq.search(codeword, pqcode, query)
-                dist = dist[0]
-                if dist in pqdistance_filename_dict:
-                    pqdistance_filename_dict[dist].append(filename)
-                else:
-                    pqdistance_filename_dict[dist] = [filename]
-                counter += 1
-                if counter == utils.database_size:
-                    break
-            print("2. Current time is:", datetime.now())
-            # Get the minimum distances using heapq
-            smallest_distances = heapq.nsmallest(5, pqdistance_filename_dict.keys())
-            # print(smallest_distances)
-            # Retrieve filenames corresponding to the smallest distances
-            filenames = [filename for distance, filenames in pqdistance_filename_dict.items() if
-                         distance in smallest_distances for filename in filenames]
-            print("3. Current time is:", datetime.now())
-            # Print the filenames
-            # print(filenames)
-            for filename in filenames:
-                vec = np.load(Path("./static/feature") / (filename + ".npy"))
-                real_dist = np.linalg.norm(query - vec)  # Calculate the real distance
-
-                if utils.is_valid(Path("./static/img") / (filename + ".jpg")):
-                    min_score_paths.append((filename, real_dist))
-
-            # Rank the paths in ascending order based on real distance
-            min_score_paths.sort(key=lambda x: x[1])
-            min_score_paths = min_score_paths[:utils.k_results]
-
-            http_result = []
-
-            for filename, real_dist in min_score_paths:
-                converted_path = "static/img/" + filename + ".jpg"
-                converted_filename = filename + ".jpg"
-                http_result.append((utils.lines[converted_filename], converted_path))
-
-            utils.t2 = time.time()
-
-            return render_template('index.html',
-                                   query_path=uploaded_img_path,
-                                   scores=http_result,
-                                   search_time="Query time: " + str(round(1000 * (utils.t2 - utils.t1))) + "ms",
-                                   default_text=utils.query_text,
-                                   default_size=utils.query_size,
-                                   default_mode=utils.mode,
-                                   default_database_size=utils.database_size,
-                                   default_num_results=utils.k_results,
-                                   num_results=str(len(http_result)))
+                return pq_pre_query(pq_k, img, uploaded_img_path)
 
         # vp-tree
         else:
