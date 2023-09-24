@@ -1,4 +1,4 @@
-# Image Hybrid Search Engine based on VP-Tree
+# Image Hybrid Search Engine based on Hybrid Search
 
 ## Installation
 1. Download the Flickr8k image dataset on [link](https://www.kaggle.com/datasets/adityajn105/flickr8k).
